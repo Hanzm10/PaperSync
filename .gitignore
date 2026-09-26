@@ -1,0 +1,3 @@
+# Local defines for the app. The example file is safe to commit.
+app/env/*.json
+!app/env/example.json

@@ -36,6 +36,7 @@ void paintStrokes(
   Color Function(Color stored)? resolve,
 }) {
   for (final stroke in strokes) {
+    if (stroke.deletedAt != null) continue;
     final color = resolve?.call(stroke.color) ?? stroke.color;
     if (stroke.id == selectedId) {
       _paintStroke(
@@ -113,6 +114,7 @@ void _paintStroke(
 String? hitStroke(List<Stroke> strokes, Offset mm) {
   const threshold = 4.0;
   for (final stroke in strokes.reversed) {
+    if (stroke.deletedAt != null) continue;
     final points = stroke.points.where((point) => point.touching).toList();
     if (points.length == 1) {
       if (_distance(mm, points.first) <= threshold) return stroke.id;

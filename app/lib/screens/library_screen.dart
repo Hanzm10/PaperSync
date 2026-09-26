@@ -121,6 +121,7 @@ class LibraryScreen extends ConsumerWidget {
     final name = await askName(context, title: 'New notebook');
     if (name == null || !context.mounted) return;
     final id = controller.createNotebook(name);
+    if (id.isEmpty || !context.mounted) return;
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => NotebookPagesScreen(notebookId: id),

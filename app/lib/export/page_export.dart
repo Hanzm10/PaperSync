@@ -77,6 +77,7 @@ Future<Uint8List> buildPagePdf(NotebookPage page) async {
 
 void _drawPdf(PdfGraphics canvas, PdfPoint size, List<Stroke> strokes) {
   for (final stroke in strokes) {
+    if (stroke.deletedAt != null) continue;
     final points = stroke.points.where((point) => point.touching).toList();
     if (points.length < 2) continue;
     final color = PdfColor(stroke.color.r, stroke.color.g, stroke.color.b);

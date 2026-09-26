@@ -12,10 +12,11 @@ List<Notebook> sampleNotebooks() {
     Notebook(
       id: 'nb-lecture',
       name: 'Lecture notes',
-      inkColor: AppColors.storedInk,
+      inkColorArgb: AppColors.storedInk.toARGB32(),
       createdAt: now.subtract(const Duration(days: 12)),
       pages: [
         _page(
+          notebookId: 'nb-lecture',
           id: 'page-lecture-1',
           index: 1,
           createdAt: now.subtract(const Duration(days: 3)),
@@ -27,6 +28,7 @@ List<Notebook> sampleNotebooks() {
           ],
         ),
         _page(
+          notebookId: 'nb-lecture',
           id: 'page-lecture-2',
           index: 2,
           createdAt: yesterday,
@@ -39,6 +41,7 @@ List<Notebook> sampleNotebooks() {
           ],
         ),
         _page(
+          notebookId: 'nb-lecture',
           id: 'page-lecture-3',
           index: 3,
           createdAt: now,
@@ -53,10 +56,11 @@ List<Notebook> sampleNotebooks() {
     Notebook(
       id: 'nb-studio',
       name: 'Studio',
-      inkColor: AppColors.storedInk,
+      inkColorArgb: AppColors.storedInk.toARGB32(),
       createdAt: yesterday,
       pages: [
         _page(
+          notebookId: 'nb-studio',
           id: 'page-studio-1',
           index: 1,
           createdAt: yesterday,
@@ -73,6 +77,7 @@ List<Notebook> sampleNotebooks() {
 }
 
 NotebookPage _page({
+  required String notebookId,
   required String id,
   required int index,
   required DateTime createdAt,
@@ -82,6 +87,7 @@ NotebookPage _page({
 }) {
   return NotebookPage(
     id: id,
+    notebookId: notebookId,
     pageIndex: index,
     createdAt: createdAt,
     recognizedText: recognizedText,
@@ -125,5 +131,10 @@ Stroke _line({
       ),
     );
   }
-  return Stroke(id: id, points: points, color: color, createdAt: createdAt);
+  return Stroke(
+    id: id,
+    points: points,
+    colorArgb: color.toARGB32(),
+    createdAt: createdAt,
+  );
 }

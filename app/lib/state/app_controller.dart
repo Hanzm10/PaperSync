@@ -111,7 +111,6 @@ class AppController extends Notifier<AppModel> {
   bool _penDown = false;
   bool _demoPlayed = false;
   bool _historyArmed = false;
-  int _seq = 0;
 
   @override
   AppModel build() {
@@ -123,12 +122,15 @@ class AppController extends Notifier<AppModel> {
   }
 
   String createNotebook(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty || trimmed.length > maxNotebookNameLength) return '';
+    final now = DateTime.now();
     final notebook = Notebook(
-      id: _id('nb'),
-      name: name.trim(),
+      id: newId(),
+      name: trimmed,
       pages: const [],
-      inkColor: AppColors.storedInk,
-      createdAt: DateTime.now(),
+      inkColorArgb: AppColors.storedInk.toARGB32(),
+      createdAt: now,
     );
     state = state.copyWith(notebooks: [notebook, ...state.notebooks]);
     return notebook.id;
@@ -136,7 +138,7 @@ class AppController extends Notifier<AppModel> {
 
   void renameNotebook(String id, String name) {
     final trimmed = name.trim();
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty || trimmed.length > maxNotebookNameLength) return;
     state = state.copyWith(
       notebooks: [
         for (final notebook in state.notebooks)
@@ -152,11 +154,14 @@ class AppController extends Notifier<AppModel> {
       0,
       (max, page) => page.pageIndex > max ? page.pageIndex : max,
     );
+    final now = DateTime.now();
     final page = NotebookPage(
-      id: _id('page'),
+      id: newId(),
+      notebookId: notebook.id,
       pageIndex: nextIndex + 1,
       strokes: const [],
-      createdAt: DateTime.now(),
+      createdAt: now,
+      capturedAt: now,
       recognizedText: '',
     );
     _replaceNotebook(notebook.copyWith(pages: [...notebook.pages, page]));
@@ -180,7 +185,7 @@ class AppController extends Notifier<AppModel> {
   void setInkColor(String notebookId, Color color) {
     final notebook = state.notebook(notebookId);
     if (notebook == null) return;
-    _replaceNotebook(notebook.copyWith(inkColor: color));
+    _replaceNotebook(notebook.copyWith(inkColorArgb: color.toARGB32()));
   }
 
   void armHistory(String pageId) {
@@ -237,7 +242,7 @@ class AppController extends Notifier<AppModel> {
         strokes: [
           for (final stroke in current.strokes)
             if (stroke.id == strokeId)
-              stroke.copyWith(color: color)
+              stroke.edited(colorArgb: color.toARGB32())
             else
               stroke,
         ],
@@ -248,14 +253,18 @@ class AppController extends Notifier<AppModel> {
   void eraseStroke(String pageId, String strokeId) {
     final page = state.page(pageId);
     if (page == null) return;
-    if (!page.strokes.any((stroke) => stroke.id == strokeId)) return;
+    if (!page.strokes.any(
+      (stroke) => stroke.id == strokeId && stroke.deletedAt == null,
+    )) {
+      return;
+    }
     _pushUndo(pageId);
     final current = state.page(pageId)!;
     _replacePage(
       current.copyWith(
         strokes: [
           for (final stroke in current.strokes)
-            if (stroke.id != strokeId) stroke,
+            if (stroke.id == strokeId) stroke.erased() else stroke,
         ],
       ),
     );
@@ -269,7 +278,7 @@ class AppController extends Notifier<AppModel> {
         strokes: [
           for (final stroke in page.strokes)
             if (stroke.id == strokeId)
-              stroke.copyWith(
+              stroke.edited(
                 points: [
                   for (final point in stroke.points)
                     point.shift(deltaMm.dx, deltaMm.dy),
@@ -399,9 +408,9 @@ class AppController extends Notifier<AppModel> {
     if (!_penDown || strokes.isEmpty) {
       strokes.add(
         Stroke(
-          id: _id('stroke'),
+          id: newId(),
           points: [point],
-          color: notebook.inkColor,
+          colorArgb: notebook.inkColor.toARGB32(),
           createdAt: DateTime.now(),
         ),
       );
@@ -467,8 +476,6 @@ class AppController extends Notifier<AppModel> {
       ],
     );
   }
-
-  String _id(String prefix) => '$prefix-${_seq++}';
 }
 
 enum _LiveKind { hover, draw, up, page }
@@ -494,7 +501,7 @@ List<_LiveStep> _signatureScript() {
   steps.add(
     _LiveStep(
       _LiveKind.up,
-      const StrokePoint(xMm: 112, yMm: 48, pressure: 0, touching: false),
+      StrokePoint(xMm: 112, yMm: 48, pressure: 0, touching: false),
     ),
   );
   for (var i = 0; i < 6; i++) {
@@ -507,14 +514,14 @@ List<_LiveStep> _signatureScript() {
   }
   _stroke(steps, y: 56, x0: 24, x1: 96, waves: 3);
   steps.add(
-    const _LiveStep(
+    _LiveStep(
       _LiveKind.up,
       StrokePoint(xMm: 96, yMm: 56, pressure: 0, touching: false),
     ),
   );
   for (var i = 0; i < 10; i++) {
     steps.add(
-      const _LiveStep(
+      _LiveStep(
         _LiveKind.hover,
         StrokePoint(xMm: 96, yMm: 56, pressure: 0, touching: false),
       ),

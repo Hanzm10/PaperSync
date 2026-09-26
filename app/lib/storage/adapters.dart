@@ -55,6 +55,7 @@ class NotebookAdapter extends TypeAdapter<StoredNotebook> {
       deletedAtUs: _optionalInt(fields[NotebookFields.deletedAt]),
       syncState: _int(fields[NotebookFields.syncState]),
       ownerId: _optionalString(fields[NotebookFields.ownerId]),
+      clockFlags: _int(fields[NotebookFields.clockFlags]),
     );
   }
 
@@ -69,6 +70,7 @@ class NotebookAdapter extends TypeAdapter<StoredNotebook> {
       if (obj.deletedAtUs != null) NotebookFields.deletedAt: obj.deletedAtUs!,
       NotebookFields.syncState: obj.syncState,
       if (obj.ownerId != null) NotebookFields.ownerId: obj.ownerId!,
+      NotebookFields.clockFlags: obj.clockFlags,
     });
   }
 }
@@ -95,6 +97,7 @@ class PageAdapter extends TypeAdapter<StoredPage> {
       syncState: _int(fields[PageFields.syncState]),
       ownerId: _optionalString(fields[PageFields.ownerId]),
       deletedAtUs: _optionalInt(fields[PageFields.deletedAt]),
+      clockFlags: _int(fields[PageFields.clockFlags]),
     );
   }
 
@@ -115,6 +118,7 @@ class PageAdapter extends TypeAdapter<StoredPage> {
       PageFields.syncState: obj.syncState,
       if (obj.ownerId != null) PageFields.ownerId: obj.ownerId!,
       if (obj.deletedAtUs != null) PageFields.deletedAt: obj.deletedAtUs!,
+      PageFields.clockFlags: obj.clockFlags,
     });
   }
 }
@@ -140,6 +144,7 @@ class StrokeAdapter extends TypeAdapter<StoredStroke> {
       packedPoints: _bytes(fields[StrokeFields.packedPoints]),
       timeOriginMs: _int(fields[StrokeFields.timeOriginMs]),
       legacyPoints: _points(fields[StrokeFields.legacyPoints]),
+      clockFlags: _int(fields[StrokeFields.clockFlags]),
     );
   }
 
@@ -161,6 +166,7 @@ class StrokeAdapter extends TypeAdapter<StoredStroke> {
       StrokeFields.timeOriginMs: obj.timeOriginMs,
       if (obj.legacyPoints != null)
         StrokeFields.legacyPoints: obj.legacyPoints!,
+      StrokeFields.clockFlags: obj.clockFlags,
     });
   }
 }
@@ -212,6 +218,7 @@ class CheckpointAdapter extends TypeAdapter<StoredCheckpoint> {
           _bytes(fields[CheckpointFields.packedPoints]) ?? Uint8List(0),
       timeOriginMs: _int(fields[CheckpointFields.timeOriginMs]),
       syncState: _int(fields[CheckpointFields.syncState]),
+      clockFlags: _int(fields[CheckpointFields.clockFlags]),
     );
   }
 
@@ -228,6 +235,7 @@ class CheckpointAdapter extends TypeAdapter<StoredCheckpoint> {
       CheckpointFields.packedPoints: obj.packedPoints,
       CheckpointFields.timeOriginMs: obj.timeOriginMs,
       CheckpointFields.syncState: obj.syncState,
+      CheckpointFields.clockFlags: obj.clockFlags,
     });
   }
 }

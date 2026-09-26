@@ -175,26 +175,25 @@ Future<Box<T>> _openBox<T>({
   required DateTime Function() now,
   required void Function() onQuarantine,
 }) async {
+  if (!files.hiveFileLooksReadable(directory, name)) {
+    if (directory == null) {
+      await Hive.deleteBoxFromDisk(name);
+    } else {
+      files.quarantineHiveBox(directory, name, now().millisecondsSinceEpoch);
+    }
+    onQuarantine();
+  }
   try {
     return await _open<T>(
       name: name,
       directory: directory,
       cipher: cipher,
-      crashRecovery: false,
+      crashRecovery: true,
     );
   } on HiveError {
-    final recoverable = await files.recoverableHiveFile(
-      directory: directory,
-      boxName: name,
-      cipher: cipher,
-    );
-    if (recoverable) {
-      return _open<T>(
-        name: name,
-        directory: directory,
-        cipher: cipher,
-        crashRecovery: true,
-      );
+    if (Hive.isBoxOpen(name)) {
+      onQuarantine();
+      rethrow;
     }
     if (directory == null) {
       await Hive.deleteBoxFromDisk(name);

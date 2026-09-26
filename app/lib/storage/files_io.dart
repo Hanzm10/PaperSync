@@ -1,9 +1,24 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:hive_ce/hive_ce.dart';
 
 import 'adapters.dart';
+
+/// A missing or empty file can be opened. A file whose first frame cannot
+/// fit is quarantined instead of handed to Hive, which can stall on it.
+bool hiveFileLooksReadable(String? directory, String boxName) {
+  if (directory == null) return true;
+  final file = File('$directory/$boxName.hive');
+  if (!file.existsSync()) return true;
+  final bytes = file.readAsBytesSync();
+  if (bytes.isEmpty) return true;
+  if (bytes.length < 8) return false;
+  final length = ByteData.sublistView(bytes).getUint32(0, Endian.little);
+  if (length < 8 || length > bytes.length) return false;
+  return true;
+}
 
 /// Renames a box file to `<box>.corrupt-<stamp>` and drops its lock.
 ///

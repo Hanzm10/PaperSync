@@ -317,8 +317,16 @@ class HiveNotebookStore implements NotebookStore {
       name: stored.name,
       pages: pages,
       inkColorArgb: stored.inkColorArgb,
-      createdAt: DateTime.fromMicrosecondsSinceEpoch(stored.createdAtUs),
-      updatedAt: DateTime.fromMicrosecondsSinceEpoch(stored.updatedAtUs),
+      createdAt: clockTime(
+        stored.createdAtUs,
+        stored.clockFlags,
+        clockCreatedUtc,
+      ),
+      updatedAt: clockTime(
+        stored.updatedAtUs,
+        stored.clockFlags,
+        clockUpdatedUtc,
+      ),
       syncState: stored.syncState == 1 ? SyncState.synced : SyncState.pending,
     );
   }
@@ -336,8 +344,16 @@ class HiveNotebookStore implements NotebookStore {
       notebookId: stored.notebookId,
       pageIndex: stored.pageIndex,
       strokes: strokes,
-      createdAt: DateTime.fromMicrosecondsSinceEpoch(stored.createdAtUs),
-      capturedAt: DateTime.fromMicrosecondsSinceEpoch(stored.capturedAtUs),
+      createdAt: clockTime(
+        stored.createdAtUs,
+        stored.clockFlags,
+        clockCreatedUtc,
+      ),
+      capturedAt: clockTime(
+        stored.capturedAtUs,
+        stored.clockFlags,
+        clockCapturedUtc,
+      ),
       paperRect: PaperRect(
         leftMm: stored.paperLeft,
         topMm: stored.paperTop,

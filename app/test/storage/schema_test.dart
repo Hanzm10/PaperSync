@@ -17,6 +17,7 @@ void main() {
     expect(NotebookFields.deletedAt, 5);
     expect(NotebookFields.syncState, 6);
     expect(NotebookFields.ownerId, 7);
+    expect(NotebookFields.clockFlags, 8);
 
     expect(PageFields.id, 0);
     expect(PageFields.notebookId, 1);
@@ -32,6 +33,7 @@ void main() {
     expect(PageFields.syncState, 11);
     expect(PageFields.ownerId, 12);
     expect(PageFields.deletedAt, 13);
+    expect(PageFields.clockFlags, 14);
 
     expect(StrokeFields.id, 0);
     expect(StrokeFields.pageId, 1);
@@ -46,6 +48,7 @@ void main() {
     expect(StrokeFields.packedPoints, 10);
     expect(StrokeFields.timeOriginMs, 11);
     expect(StrokeFields.legacyPoints, 12);
+    expect(StrokeFields.clockFlags, 13);
 
     expect(PointFields.xMm, 0);
     expect(PointFields.yMm, 1);
@@ -63,6 +66,7 @@ void main() {
     expect(CheckpointFields.packedPoints, 7);
     expect(CheckpointFields.timeOriginMs, 8);
     expect(CheckpointFields.syncState, 9);
+    expect(CheckpointFields.clockFlags, 10);
 
     expect(currentSchemaVersion, 2);
     expect(checkpointInterval, const Duration(milliseconds: 500));

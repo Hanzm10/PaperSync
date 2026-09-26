@@ -59,6 +59,7 @@ abstract final class NotebookFields {
   static const deletedAt = 5;
   static const syncState = 6;
   static const ownerId = 7;
+  static const clockFlags = 8;
 }
 
 abstract final class PageFields {
@@ -76,6 +77,7 @@ abstract final class PageFields {
   static const syncState = 11;
   static const ownerId = 12;
   static const deletedAt = 13;
+  static const clockFlags = 14;
 }
 
 abstract final class StrokeFields {
@@ -92,6 +94,7 @@ abstract final class StrokeFields {
   static const packedPoints = 10;
   static const timeOriginMs = 11;
   static const legacyPoints = 12;
+  static const clockFlags = 13;
 }
 
 abstract final class PointFields {
@@ -113,6 +116,7 @@ abstract final class CheckpointFields {
   static const packedPoints = 7;
   static const timeOriginMs = 8;
   static const syncState = 9;
+  static const clockFlags = 10;
 }
 
 /// Bit 0 of a packed point's flags.

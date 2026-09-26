@@ -30,6 +30,7 @@ class StoredNotebook {
     required this.syncState,
     this.deletedAtUs,
     this.ownerId,
+    this.clockFlags = 0,
   });
 
   final String id;
@@ -40,6 +41,7 @@ class StoredNotebook {
   final int? deletedAtUs;
   final int syncState;
   final String? ownerId;
+  final int clockFlags;
 
   static StoredNotebook fromDomain(Notebook notebook, {String? ownerId}) {
     return StoredNotebook(
@@ -51,6 +53,11 @@ class StoredNotebook {
       deletedAtUs: notebook.deletedAt?.microsecondsSinceEpoch,
       syncState: _sync(notebook.syncState),
       ownerId: ownerId,
+      clockFlags: clockFlagsFor(
+        created: notebook.createdAt,
+        updated: notebook.updatedAt,
+        deleted: notebook.deletedAt,
+      ),
     );
   }
 }
@@ -71,6 +78,7 @@ class StoredPage {
     required this.syncState,
     this.deletedAtUs,
     this.ownerId,
+    this.clockFlags = 0,
   });
 
   final String id;
@@ -87,6 +95,7 @@ class StoredPage {
   final int? deletedAtUs;
   final int syncState;
   final String? ownerId;
+  final int clockFlags;
 
   static StoredPage fromDomain(
     NotebookPage page, {
@@ -108,6 +117,10 @@ class StoredPage {
       deletedAtUs: deletedAtUs,
       syncState: _sync(page.syncState),
       ownerId: ownerId,
+      clockFlags: clockFlagsFor(
+        created: page.createdAt,
+        captured: page.capturedAt,
+      ),
     );
   }
 
@@ -127,6 +140,7 @@ class StoredPage {
       deletedAtUs: deletedAtUs ?? this.deletedAtUs,
       syncState: syncState ?? this.syncState,
       ownerId: ownerId,
+      clockFlags: clockFlags,
     );
   }
 }
@@ -146,6 +160,7 @@ class StoredStroke {
     this.ownerId,
     this.packedPoints,
     this.legacyPoints,
+    this.clockFlags = 0,
   });
 
   final String id;
@@ -161,6 +176,7 @@ class StoredStroke {
   final Uint8List? packedPoints;
   final int timeOriginMs;
   final List<StoredPoint>? legacyPoints;
+  final int clockFlags;
 
   static StoredStroke fromDomain(
     String pageId,
@@ -182,6 +198,11 @@ class StoredStroke {
       ownerId: ownerId,
       packedPoints: packed.bytes,
       timeOriginMs: packed.timeOriginMs,
+      clockFlags: clockFlagsFor(
+        created: stroke.createdAt,
+        updated: stroke.updatedAt,
+        deleted: stroke.deletedAt,
+      ),
     );
   }
 
@@ -205,6 +226,7 @@ class StoredStroke {
       packedPoints: packedPoints ?? this.packedPoints,
       timeOriginMs: timeOriginMs ?? this.timeOriginMs,
       legacyPoints: clearLegacy ? null : (legacyPoints ?? this.legacyPoints),
+      clockFlags: clockFlags,
     );
   }
 
@@ -215,10 +237,12 @@ class StoredStroke {
       points: points,
       colorArgb: colorArgb,
       width: width,
-      createdAt: _time(createdAtUs),
-      updatedAt: _time(updatedAtUs),
+      createdAt: clockTime(createdAtUs, clockFlags, clockCreatedUtc),
+      updatedAt: clockTime(updatedAtUs, clockFlags, clockUpdatedUtc),
       version: version < 1 ? 1 : version,
-      deletedAt: deletedAtUs == null ? null : _time(deletedAtUs!),
+      deletedAt: deletedAtUs == null
+          ? null
+          : clockTime(deletedAtUs!, clockFlags, clockDeletedUtc),
       syncState: _decodeSync(syncState),
     );
   }
@@ -236,6 +260,7 @@ class StoredCheckpoint {
     required this.packedPoints,
     required this.timeOriginMs,
     required this.syncState,
+    this.clockFlags = 0,
   });
 
   final String strokeId;
@@ -248,6 +273,7 @@ class StoredCheckpoint {
   final Uint8List packedPoints;
   final int timeOriginMs;
   final int syncState;
+  final int clockFlags;
 
   static StoredCheckpoint fromStroke(String pageId, Stroke stroke) {
     final stored = StoredStroke.fromDomain(pageId, stroke);
@@ -262,6 +288,7 @@ class StoredCheckpoint {
       packedPoints: stored.packedPoints ?? Uint8List(0),
       timeOriginMs: stored.timeOriginMs,
       syncState: stored.syncState,
+      clockFlags: stored.clockFlags,
     );
   }
 
@@ -277,14 +304,38 @@ class StoredCheckpoint {
       syncState: _sync(SyncState.pending),
       packedPoints: packedPoints,
       timeOriginMs: timeOriginMs,
+      clockFlags: clockFlags,
     );
   }
+}
+
+const int clockCreatedUtc = 1;
+const int clockUpdatedUtc = 2;
+const int clockDeletedUtc = 4;
+const int clockCapturedUtc = 8;
+
+int clockFlagsFor({
+  required DateTime created,
+  DateTime? updated,
+  DateTime? deleted,
+  DateTime? captured,
+}) {
+  var flags = 0;
+  if (created.isUtc) flags |= clockCreatedUtc;
+  if (updated != null && updated.isUtc) flags |= clockUpdatedUtc;
+  if (deleted != null && deleted.isUtc) flags |= clockDeletedUtc;
+  if (captured != null && captured.isUtc) flags |= clockCapturedUtc;
+  return flags;
+}
+
+DateTime clockTime(int microseconds, int flags, int bit) {
+  return DateTime.fromMicrosecondsSinceEpoch(
+    microseconds,
+    isUtc: flags & bit != 0,
+  );
 }
 
 int _sync(SyncState state) => state == SyncState.synced ? 1 : 0;
 
 SyncState _decodeSync(int value) =>
     value == 1 ? SyncState.synced : SyncState.pending;
-
-DateTime _time(int microseconds) =>
-    DateTime.fromMicrosecondsSinceEpoch(microseconds);

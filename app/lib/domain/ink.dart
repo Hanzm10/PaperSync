@@ -57,6 +57,7 @@ class StrokePoint {
     required int pressure,
     required this.touching,
     this.tMs = 0,
+    this.approximateTime = false,
   }) : xMm = xMm.clamp(0, pageWidthMm).toDouble(),
        yMm = yMm.clamp(0, pageHeightMm).toDouble(),
        pressure = _checkedPressure(pressure);
@@ -67,6 +68,10 @@ class StrokePoint {
   final bool touching;
   final int tMs;
 
+  /// True when the timestamp is the phone's arrival time because this boot
+  /// had no live sample to anchor the pen's clock.
+  final bool approximateTime;
+
   StrokePoint shift(double dxMm, double dyMm) {
     return StrokePoint(
       xMm: xMm + dxMm,
@@ -74,6 +79,7 @@ class StrokePoint {
       pressure: pressure,
       touching: touching,
       tMs: tMs,
+      approximateTime: approximateTime,
     );
   }
 
@@ -83,6 +89,7 @@ class StrokePoint {
     pressure: pressure,
     touching: touching,
     tMs: tMs,
+    approximateTime: approximateTime,
   );
 
   @override
@@ -93,11 +100,13 @@ class StrokePoint {
         other.yMm == yMm &&
         other.pressure == pressure &&
         other.touching == touching &&
-        other.tMs == tMs;
+        other.tMs == tMs &&
+        other.approximateTime == approximateTime;
   }
 
   @override
-  int get hashCode => Object.hash(xMm, yMm, pressure, touching, tMs);
+  int get hashCode =>
+      Object.hash(xMm, yMm, pressure, touching, tMs, approximateTime);
 }
 
 class Stroke {
@@ -195,8 +204,10 @@ class NotebookPage {
     DateTime? capturedAt,
     this.paperRect = PaperRect.fullPage,
     this.recognizedText = '',
+    List<String> markers = const [],
     this.syncState = SyncState.pending,
   }) : strokes = List<Stroke>.unmodifiable(strokes),
+       markers = List<String>.unmodifiable(markers),
        capturedAt = capturedAt ?? createdAt;
 
   final String id;
@@ -207,6 +218,9 @@ class NotebookPage {
   final DateTime capturedAt;
   final PaperRect paperRect;
   final String recognizedText;
+
+  /// Short notes written onto the page, such as "3 samples lost".
+  final List<String> markers;
   final SyncState syncState;
 
   List<Stroke> get visibleStrokes => List<Stroke>.unmodifiable(
@@ -216,6 +230,7 @@ class NotebookPage {
   NotebookPage copyWith({
     List<Stroke>? strokes,
     String? recognizedText,
+    List<String>? markers,
     PaperRect? paperRect,
     DateTime? capturedAt,
     SyncState? syncState,
@@ -229,6 +244,7 @@ class NotebookPage {
       capturedAt: capturedAt ?? this.capturedAt,
       paperRect: paperRect ?? this.paperRect,
       recognizedText: recognizedText ?? this.recognizedText,
+      markers: markers ?? this.markers,
       syncState: syncState ?? this.syncState,
     );
   }
@@ -245,6 +261,7 @@ class NotebookPage {
         other.capturedAt == capturedAt &&
         other.paperRect == paperRect &&
         other.recognizedText == recognizedText &&
+        _listEquals(other.markers, markers) &&
         other.syncState == syncState;
   }
 
@@ -258,6 +275,7 @@ class NotebookPage {
     capturedAt,
     paperRect,
     recognizedText,
+    Object.hashAll(markers),
     syncState,
   );
 }

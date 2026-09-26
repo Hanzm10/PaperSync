@@ -1,13 +1,23 @@
 import 'dart:async';
-import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../ble/link_status.dart';
+import '../ble/pen_transport.dart';
+import '../ble/permissions.dart';
+import '../ble/simulated_pen_transport.dart';
+import '../capture/capture_machine.dart';
+import '../capture/markers.dart';
 import '../data/sample_notebooks.dart';
 import '../models/ink_models.dart';
 import '../models/pen_link.dart';
+import '../protocol/codec.dart';
 import '../theme/app_colors.dart';
+import 'debug_ink_stats.dart';
+import 'pen_transport_provider.dart';
+import 'signal.dart';
 
 final appControllerProvider = NotifierProvider<AppController, AppModel>(
   AppController.new,
@@ -104,21 +114,68 @@ class AppController extends Notifier<AppModel> {
   AppController([this._initial]);
 
   final AppModel? _initial;
-  Timer? _liveTimer;
-  Timer? _connectTimer;
-  List<_LiveStep> _steps = const [];
-  int _stepIndex = 0;
-  bool _penDown = false;
-  bool _demoPlayed = false;
+  late PenTransport _transport;
+  late BluetoothPermissions _permissions;
+  late DateTime Function() _clock;
+  CaptureMachine _machine = CaptureMachine();
+  StreamSubscription<List<FoundPen>>? _scanSub;
+  final Map<String, String> _ids = {};
+  final ValueNotifier<DebugInkStats> debugStats = ValueNotifier<DebugInkStats>(
+    DebugInkStats.empty,
+  );
+
+  bool _active = true;
+  int _epoch = 0;
+  bool _capturing = false;
+  bool _strokeOpen = false;
+  bool _replaying = false;
+  int _replayStrokes = 0;
+  int _seqGaps = 0;
+  int? _mtu;
+  int? _rssi;
+  LinkStatus? _linkStatus;
+  DateTime? _rateStart;
+  DateTime? _lastArrival;
+  int _windowSamples = 0;
+  int _windowNotes = 0;
   bool _historyArmed = false;
 
   @override
   AppModel build() {
-    ref.onDispose(() {
-      _liveTimer?.cancel();
-      _connectTimer?.cancel();
+    final epoch = ++_epoch;
+    _active = true;
+    final transport = ref.watch(penTransportProvider);
+    _transport = transport;
+    _permissions = ref.watch(bluetoothPermissionsProvider);
+    _clock = ref.watch(captureClockProvider);
+    _machine = CaptureMachine();
+    final notes = transport.notifications.listen((bytes) {
+      if (epoch != _epoch) return;
+      _onBytes(bytes);
     });
-    return _initial ?? AppModel.sample();
+    final status = transport.status.listen((next) {
+      if (epoch != _epoch) return;
+      _onStatus(next);
+    });
+    final battery = transport.battery.listen((level) {
+      if (epoch != _epoch) return;
+      _onBattery(level);
+    });
+    ref.onDispose(() {
+      _active = false;
+      _epoch += 1;
+      unawaited(notes.cancel());
+      unawaited(status.cancel());
+      unawaited(battery.cancel());
+      unawaited(_scanSub?.cancel());
+      unawaited(transport.dispose());
+      debugStats.dispose();
+    });
+    final initial = _initial ?? AppModel.sample();
+    if (initial.link.permissionGranted && !initial.link.bonded) {
+      _listenScan();
+    }
+    return initial;
   }
 
   String createNotebook(String name) {
@@ -292,54 +349,30 @@ class AppController extends Notifier<AppModel> {
   }
 
   void grantPermission() {
-    state = state.copyWith(link: state.link.copyWith(permissionGranted: true));
+    unawaited(_grant());
   }
 
   void connectPen(String name) {
-    _connectTimer?.cancel();
-    final now = DateTime.now();
+    if (!_active) return;
     state = state.copyWith(
       link: state.link.copyWith(
         bonded: true,
         penName: name,
         permissionGranted: true,
         state: LinkState.reconnecting,
-        queuedStrokes: 12,
-        batteryPercent: state.link.batteryPercent ?? 76,
-        signal: 'Weak',
-        lastPacket: now,
       ),
     );
-    _connectTimer = Timer(const Duration(milliseconds: 1200), () {
-      final flushed = DateTime.now();
-      state = state.copyWith(
-        link: state.link.copyWith(
-          state: LinkState.saving,
-          queuedStrokes: 0,
-          batteryPercent: 76,
-          signal: 'Strong',
-          lastSaved: flushed,
-          lastPacket: flushed,
-        ),
-      );
-    });
+    unawaited(_transport.connect(_ids[name] ?? name));
   }
 
   void disconnectPen() {
-    _connectTimer?.cancel();
-    state = state.copyWith(
-      link: state.link.copyWith(
-        state: LinkState.disconnected,
-        queuedStrokes: 0,
-        signal: 'None',
-        lastSaved: state.link.lastSaved ?? DateTime.now(),
-      ),
-    );
+    unawaited(_transport.disconnect());
   }
 
   void forgetPen() {
-    _connectTimer?.cancel();
+    unawaited(_transport.forget());
     stopLive();
+    if (!_active) return;
     state = state.copyWith(
       link: PenLink.unpaired(permissionGranted: state.link.permissionGranted),
       clearLive: true,
@@ -348,6 +381,7 @@ class AppController extends Notifier<AppModel> {
 
   void startLive(String notebookId) {
     stopLive();
+    if (!_active) return;
     if (state.notebook(notebookId) == null) return;
     if (state.notebook(notebookId)!.pages.isEmpty) {
       addPage(notebookId);
@@ -356,81 +390,275 @@ class AppController extends Notifier<AppModel> {
     final page = notebook.pages.reduce(
       (a, b) => a.pageIndex > b.pageIndex ? a : b,
     );
+    _machine = CaptureMachine(strokesOnPage: page.strokes.length);
+    _strokeOpen = false;
+    _capturing = true;
     state = state.copyWith(
       liveNotebookId: notebookId,
       livePageId: page.id,
       hover: null,
     );
-    if (_demoPlayed || !state.link.connected) return;
-    _demoPlayed = true;
-    _steps = _signatureScript();
-    _stepIndex = 0;
-    _penDown = false;
-    _liveTimer = Timer.periodic(const Duration(milliseconds: 36), _onLiveTick);
+    final transport = _transport;
+    if (transport is SimulatedPenTransport && state.link.connected) {
+      transport.play();
+    }
   }
 
   void stopLive() {
-    _liveTimer?.cancel();
-    _liveTimer = null;
+    _capturing = false;
+    final transport = _transport;
+    if (transport is SimulatedPenTransport) transport.stop();
+    if (!_active) return;
+    for (final event in _machine.disconnect()) {
+      _apply(event);
+    }
     if (state.hover != null) {
       state = state.copyWith(hover: null);
     }
   }
 
-  void _onLiveTick(Timer timer) {
-    if (_stepIndex >= _steps.length) {
-      timer.cancel();
-      state = state.copyWith(hover: null);
-      return;
+  Future<void> _grant() async {
+    PermissionOutcome outcome;
+    try {
+      outcome = await _permissions.grant();
+    } on Object {
+      outcome = PermissionOutcome.denied;
     }
-    final step = _steps[_stepIndex++];
-    switch (step.kind) {
-      case _LiveKind.hover:
-        state = state.copyWith(hover: step.point);
-      case _LiveKind.up:
-        _penDown = false;
-        state = state.copyWith(hover: step.point);
-      case _LiveKind.draw:
-        _appendLivePoint(step.point!);
-      case _LiveKind.page:
-        _turnLivePage();
+    if (!_active) return;
+    switch (outcome) {
+      case PermissionOutcome.granted:
+        state = state.copyWith(
+          link: state.link.copyWith(permissionGranted: true),
+        );
+        _listenScan();
+      case PermissionOutcome.denied:
+        _onStatus(const Unavailable('Bluetooth permission denied'));
+      case PermissionOutcome.permanentlyDenied:
+        _onStatus(const Unavailable('Bluetooth permission permanently denied'));
     }
   }
 
-  void _appendLivePoint(StrokePoint point) {
+  void _listenScan() {
+    _scanSub ??= _transport.scan().listen((pens) {
+      if (!_active) return;
+      _ids
+        ..clear()
+        ..addEntries([for (final pen in pens) MapEntry(pen.name, pen.id)]);
+      state = state.copyWith(nearbyPens: [for (final pen in pens) pen.name]);
+    });
+  }
+
+  void _onBytes(Uint8List bytes) {
+    if (!_capturing || !_active) return;
+    final arrival = _clock();
+    final result = decode(bytes);
+    final sampleCount = switch (result) {
+      Decoded(:final notification) => notification.samples.length,
+      Rejected() => 0,
+    };
+    _noteRate(sampleCount, arrival);
+    final events = _machine.ingest(result, arrival: arrival);
+    for (final event in events) {
+      _apply(event);
+    }
+    if (!_active) return;
+    state = state.copyWith(link: state.link.copyWith(lastPacket: arrival));
+  }
+
+  void _onStatus(LinkStatus status) {
+    if (!_active) return;
+    _linkStatus = status;
+    final dropped = switch (status) {
+      Disconnected() || Unavailable() => true,
+      Connecting() || Connected() || Reconnecting() => false,
+    };
+    if (dropped && _capturing) {
+      for (final event in _machine.disconnect()) {
+        _apply(event);
+      }
+    }
+    _paintLink(saved: false);
+    _publishDebug();
+  }
+
+  void _onBattery(int level) {
+    if (!_active) return;
+    final clamped = level < 0 ? 0 : (level > 100 ? 100 : level);
+    state = state.copyWith(link: state.link.copyWith(batteryPercent: clamped));
+  }
+
+  void _apply(CaptureEvent event) {
+    if (!_active) return;
+    switch (event) {
+      case StrokeOpened(:final point):
+        _openStroke(point);
+        if (_replaying) {
+          _replayStrokes += 1;
+          _paintLink(saved: false);
+        }
+      case PointAdded(:final point):
+        _addPoint(point);
+      case StrokeClosed():
+        _strokeOpen = false;
+      case HoverMoved(:final point):
+        state = state.copyWith(hover: point);
+      case HoverLost():
+        if (state.hover != null) state = state.copyWith(hover: null);
+      case PageTurned():
+        _turnLivePage();
+      case SamplesLost(:final count):
+        _seqGaps += count;
+        _markLoss(count);
+        _publishDebug();
+      case ReplayStarted():
+        _replaying = true;
+        _replayStrokes = 0;
+        _paintLink(saved: false);
+        _publishDebug();
+      case ReplayEnded():
+        _replaying = false;
+        _replayStrokes = 0;
+        _paintLink(saved: true);
+        _publishDebug();
+      case ProtocolError():
+        break;
+    }
+  }
+
+  void _openStroke(StrokePoint point) {
     final pageId = state.livePageId;
     final notebookId = state.liveNotebookId;
     final page = pageId == null ? null : state.page(pageId);
     final notebook = notebookId == null ? null : state.notebook(notebookId);
     if (page == null || notebook == null) return;
+    final stroke = Stroke(
+      id: newId(),
+      points: [point],
+      colorArgb: notebook.inkColorArgb,
+      createdAt: _when(point),
+    );
+    _replacePage(page.copyWith(strokes: [...page.strokes, stroke]));
+    _strokeOpen = true;
+    if (state.hover != null) state = state.copyWith(hover: null);
+  }
 
-    final strokes = [...page.strokes];
-    if (!_penDown || strokes.isEmpty) {
-      strokes.add(
-        Stroke(
-          id: newId(),
-          points: [point],
-          colorArgb: notebook.inkColor.toARGB32(),
-          createdAt: DateTime.now(),
-        ),
-      );
-    } else {
-      final last = strokes.removeLast();
-      strokes.add(last.copyWith(points: [...last.points, point]));
-    }
-    _penDown = true;
+  void _addPoint(StrokePoint point) {
+    if (!_strokeOpen) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null || page.strokes.isEmpty) return;
+    final last = page.strokes.last;
+    final strokes = [
+      ...page.strokes.sublist(0, page.strokes.length - 1),
+      last.copyWith(points: [...last.points, point]),
+    ];
     _replacePage(page.copyWith(strokes: strokes));
-    if (state.hover != null) {
-      state = state.copyWith(hover: null);
-    }
   }
 
   void _turnLivePage() {
     final notebookId = state.liveNotebookId;
     if (notebookId == null) return;
     final id = addPage(notebookId);
-    _penDown = false;
+    if (id.isEmpty) return;
+    _strokeOpen = false;
     state = state.copyWith(livePageId: id, hover: null);
+  }
+
+  void _markLoss(int count) {
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null) return;
+    _replacePage(
+      page.copyWith(markers: [...page.markers, samplesLostMarker(count)]),
+    );
+  }
+
+  void _paintLink({required bool saved}) {
+    final status = _linkStatus;
+    if (status == null || !_active) return;
+    final previous = state.link;
+    switch (status) {
+      case Unavailable(:final reason):
+        final denied = reason.toLowerCase().contains('permission');
+        state = state.copyWith(
+          link: previous.copyWith(
+            state: LinkState.disconnected,
+            signal: 'None',
+            queuedStrokes: 0,
+            permissionGranted: denied ? false : previous.permissionGranted,
+          ),
+        );
+      case Disconnected():
+        state = state.copyWith(
+          link: previous.copyWith(
+            state: LinkState.disconnected,
+            signal: 'None',
+            queuedStrokes: 0,
+            lastSaved: previous.lastSaved ?? _clock(),
+          ),
+        );
+      case Connecting():
+      case Reconnecting():
+        state = state.copyWith(
+          link: previous.copyWith(
+            state: LinkState.reconnecting,
+            queuedStrokes: _replaying ? _replayStrokes : previous.queuedStrokes,
+          ),
+        );
+      case Connected(:final mtu, :final rssi):
+        _mtu = mtu;
+        _rssi = rssi;
+        state = state.copyWith(
+          link: previous.copyWith(
+            state: _replaying ? LinkState.reconnecting : LinkState.saving,
+            bonded: true,
+            permissionGranted: true,
+            signal: signalForRssi(rssi),
+            penName: previous.penName ?? 'PaperSync Pen',
+            queuedStrokes: _replaying ? _replayStrokes : 0,
+            lastSaved: saved ? _clock() : previous.lastSaved,
+          ),
+        );
+    }
+  }
+
+  void _noteRate(int samples, DateTime now) {
+    _lastArrival = now;
+    _rateStart ??= now;
+    final elapsed = now.difference(_rateStart!).inMilliseconds;
+    if (elapsed >= 1000) {
+      _publishDebug();
+      _rateStart = now;
+      _windowSamples = samples;
+      _windowNotes = 1;
+    } else {
+      _windowSamples += samples;
+      _windowNotes += 1;
+    }
+    _publishDebug();
+  }
+
+  void _publishDebug() {
+    if (!kDebugMode || !_active) return;
+    final start = _rateStart;
+    final end = _lastArrival;
+    final elapsed = start == null || end == null
+        ? 0
+        : end.difference(start).inMilliseconds;
+    final seconds = elapsed <= 0 ? 1.0 : elapsed / 1000.0;
+    debugStats.value = DebugInkStats(
+      samplesPerSecond: _windowSamples / seconds,
+      notificationsPerSecond: _windowNotes / seconds,
+      mtu: _mtu,
+      seqGaps: _seqGaps,
+      rssi: _rssi,
+      replay: _replaying,
+    );
+  }
+
+  DateTime _when(StrokePoint point) {
+    if (point.tMs <= 0) return _clock();
+    return DateTime.fromMillisecondsSinceEpoch(point.tMs);
   }
 
   void _pushUndo(String pageId) {
@@ -474,86 +702,6 @@ class AppController extends Notifier<AppModel> {
         for (final current in state.notebooks)
           if (current.id == notebook.id) notebook else current,
       ],
-    );
-  }
-}
-
-enum _LiveKind { hover, draw, up, page }
-
-class _LiveStep {
-  const _LiveStep(this.kind, [this.point]);
-
-  final _LiveKind kind;
-  final StrokePoint? point;
-}
-
-List<_LiveStep> _signatureScript() {
-  final steps = <_LiveStep>[];
-  for (var i = 0; i < 8; i++) {
-    steps.add(
-      _LiveStep(
-        _LiveKind.hover,
-        StrokePoint(xMm: 16 + i * 1.5, yMm: 40, pressure: 0, touching: false),
-      ),
-    );
-  }
-  _stroke(steps, y: 42, x0: 20, x1: 112, waves: 5);
-  steps.add(
-    _LiveStep(
-      _LiveKind.up,
-      StrokePoint(xMm: 112, yMm: 48, pressure: 0, touching: false),
-    ),
-  );
-  for (var i = 0; i < 6; i++) {
-    steps.add(
-      _LiveStep(
-        _LiveKind.hover,
-        StrokePoint(xMm: 24 + i * 1.2, yMm: 56, pressure: 0, touching: false),
-      ),
-    );
-  }
-  _stroke(steps, y: 56, x0: 24, x1: 96, waves: 3);
-  steps.add(
-    _LiveStep(
-      _LiveKind.up,
-      StrokePoint(xMm: 96, yMm: 56, pressure: 0, touching: false),
-    ),
-  );
-  for (var i = 0; i < 10; i++) {
-    steps.add(
-      _LiveStep(
-        _LiveKind.hover,
-        StrokePoint(xMm: 96, yMm: 56, pressure: 0, touching: false),
-      ),
-    );
-  }
-  steps.add(const _LiveStep(_LiveKind.page));
-  return steps;
-}
-
-void _stroke(
-  List<_LiveStep> steps, {
-  required double y,
-  required double x0,
-  required double x1,
-  required int waves,
-}) {
-  const count = 32;
-  for (var i = 0; i <= count; i++) {
-    final t = i / count;
-    final x = x0 + (x1 - x0) * t;
-    final wave = math.sin(t * waves * math.pi) * 2.2;
-    final pressure = (5000 + math.sin(t * math.pi) * 9000).round();
-    steps.add(
-      _LiveStep(
-        _LiveKind.draw,
-        StrokePoint(
-          xMm: x,
-          yMm: (y + wave).clamp(0, pageHeightMm).toDouble(),
-          pressure: pressure,
-          touching: true,
-        ),
-      ),
     );
   }
 }

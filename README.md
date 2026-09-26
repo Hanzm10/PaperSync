@@ -17,6 +17,7 @@ Migrations are in `supabase/migrations/`. The service role key stays on the serv
 
 - `app/` is the Flutter project.
 - `docs/` records the v1 pen protocol and the decisions later phases build on.
+- `docs/plans/` is the software build plan (start at [docs/plans/00-index.md](docs/plans/00-index.md)).
 - `app/env/example.json` is the template for local defines. Other `app/env/*.json` files stay off the repo.
 
 ## Run

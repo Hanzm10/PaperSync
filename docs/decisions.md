@@ -19,6 +19,14 @@ than a JSON array of `{x, y, p, t}`. The packed form is about four times
 smaller, and the server can check the length. Phase 1 keeps points in memory
 as `StrokePoint` values. The column change lands with the cloud schema work.
 
+## Undo history
+
+Undo and redo stay in memory. A restart keeps the ink and drops the undo stack. That is intentional: the stack is not a second copy of the notebook.
+
+## Web demo
+
+Phone boxes are encrypted. The web demo is not. The README says so.
+
 ## Sign-in
 
 Sign-in is an emailed 6-digit code (Supabase email OTP). A magic link would

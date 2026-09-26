@@ -30,6 +30,27 @@ void main() {
   test('ble imports only protocol', () {
     expect(_layerViolations('ble', const ['ble', 'protocol']), isEmpty);
   });
+
+  test('storage imports only domain', () {
+    expect(_storageViolations(), isEmpty);
+  });
+}
+
+List<String> _storageViolations() {
+  final violations = <String>[];
+  final dir = Directory('lib/storage');
+  expect(dir.existsSync(), isTrue, reason: 'missing lib/storage');
+  for (final entity in dir.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    for (final uri in _importUris(entity.readAsStringSync())) {
+      if (uri.startsWith('dart:')) continue;
+      if (uri.startsWith('package:hive_ce/')) continue;
+      if (!_staysInside(entity.path, uri, const ['storage', 'domain'])) {
+        violations.add('${entity.path} imports $uri');
+      }
+    }
+  }
+  return violations;
 }
 
 List<String> _layerViolations(String layer, List<String> allowed) {

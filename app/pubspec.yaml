@@ -19,6 +19,8 @@ dependencies:
   flutter_blue_plus: ^2.3.13
   permission_handler: ^13.0.2
   flutter_secure_storage: ^11.0.0
+  hive_ce: ^2.20.0
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:

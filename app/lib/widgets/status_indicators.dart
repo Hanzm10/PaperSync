@@ -40,7 +40,10 @@ class StatusPill extends StatelessWidget {
                 Container(
                   width: 6,
                   height: 6,
-                  decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: tone,
+                    shape: BoxShape.circle,
+                  ),
                 ),
                 const SizedBox(width: 7),
                 Text(
@@ -55,10 +58,8 @@ class StatusPill extends StatelessWidget {
                   const SizedBox(width: 6),
                   Text(
                     '$battery%',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colors.meta,
-                      letterSpacing: 0,
-                    ),
+                    style: Theme.of(context).textTheme.bodySmall
+                        ?.copyWith(color: colors.meta, letterSpacing: 0),
                   ),
                 ],
               ],
@@ -93,9 +94,8 @@ class StatusLine extends StatelessWidget {
             child: Text(
               statusSentence(link),
               key: const Key('status-line'),
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colors.ink,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colors.ink),
             ),
           ),
         ],

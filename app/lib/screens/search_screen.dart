@@ -50,9 +50,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           style: Theme.of(context).textTheme.bodyMedium,
           decoration: InputDecoration(
             hintText: 'Search handwriting',
-            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.meta,
-            ),
+            hintStyle: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: colors.meta),
             border: InputBorder.none,
             isCollapsed: true,
           ),
@@ -60,9 +59,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         ),
         link: model.link,
         onStatusTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const DeviceScreen()),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const DeviceScreen()));
         },
       ),
       body: _body(context, indexed, results, query, colors),
@@ -83,9 +82,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           child: Text(
             'Search reads your handwriting after a page is saved.',
             textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.meta,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: colors.meta),
           ),
         ),
       );
@@ -95,9 +93,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       return Center(
         child: Text(
           'No pages match.',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colors.meta,
-          ),
+          style: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: colors.meta),
         ),
       );
     }
@@ -166,8 +163,9 @@ class _Hit {
   final NotebookPage page;
 
   bool matches(String query) {
-    final haystack = '${notebook.name} page ${page.pageIndex} ${page.recognizedText}'
-        .toLowerCase();
+    final haystack =
+        '${notebook.name} page ${page.pageIndex} ${page.recognizedText}'
+            .toLowerCase();
     return haystack.contains(query);
   }
 }

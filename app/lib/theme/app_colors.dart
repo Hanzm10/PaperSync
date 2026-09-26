@@ -111,7 +111,8 @@ class AppColors extends ThemeExtension<AppColors> {
       meta: Color.lerp(meta, other.meta, t) ?? meta,
       line: Color.lerp(line, other.line, t) ?? line,
       danger: Color.lerp(danger, other.danger, t) ?? danger,
-      statusSaving: Color.lerp(statusSaving, other.statusSaving, t) ?? statusSaving,
+      statusSaving:
+          Color.lerp(statusSaving, other.statusSaving, t) ?? statusSaving,
       statusReconnecting:
           Color.lerp(statusReconnecting, other.statusReconnecting, t) ??
           statusReconnecting,

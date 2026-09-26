@@ -31,9 +31,8 @@ class PageRow extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Page ${page.pageIndex} · ${formatMonthDay(page.createdAt)}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: colors.meta,
-              ),
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: colors.meta),
             ),
           ],
         ),

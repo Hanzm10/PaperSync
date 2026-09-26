@@ -15,7 +15,8 @@ const _months = [
   'Dec',
 ];
 
-String formatMonthDay(DateTime date) => '${_months[date.month - 1]} ${date.day}';
+String formatMonthDay(DateTime date) =>
+    '${_months[date.month - 1]} ${date.day}';
 
 String formatTime(DateTime time) {
   final hour = time.hour % 12 == 0 ? 12 : time.hour % 12;

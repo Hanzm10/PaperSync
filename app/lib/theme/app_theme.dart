@@ -87,9 +87,7 @@ class AppTheme {
           minimumSize: const Size(64, 42),
           padding: const EdgeInsets.symmetric(horizontal: 18),
           elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(

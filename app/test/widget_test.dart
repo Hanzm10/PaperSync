@@ -40,10 +40,7 @@ void main() {
       MaterialApp(
         theme: AppTheme.light(),
         home: const Center(
-          child: SizedBox(
-            width: 340,
-            child: InkPage(strokes: []),
-          ),
+          child: SizedBox(width: 340, child: InkPage(strokes: [])),
         ),
       ),
     );
@@ -51,7 +48,9 @@ void main() {
     expect(size.width / size.height, closeTo(pageAspect, 0.01));
   });
 
-  testWidgets('library opens a notebook, the editor, and search', (tester) async {
+  testWidgets('library opens a notebook, the editor, and search', (
+    tester,
+  ) async {
     await tester.pumpWidget(const ProviderScope(child: PaperSyncApp()));
     await tester.pumpAndSettle();
 

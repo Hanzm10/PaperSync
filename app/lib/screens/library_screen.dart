@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -39,7 +41,7 @@ class LibraryScreen extends ConsumerWidget {
               bonded: model.link.bonded,
               onPrimary: () {
                 if (model.link.bonded) {
-                  _createNotebook(context, controller);
+                  unawaited(_createNotebook(context, controller));
                 } else {
                   _openDevice(context);
                 }
@@ -108,9 +110,8 @@ class LibraryScreen extends ConsumerWidget {
   }
 
   void _openDevice(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const DeviceScreen()),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const DeviceScreen()));
   }
 
   Future<void> _createNotebook(
@@ -148,9 +149,8 @@ class _EmptyLibrary extends StatelessWidget {
                   ? 'Notebooks you write show up here.'
                   : 'Pair your pen to start a notebook.',
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colors.meta,
-              ),
+              style: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colors.meta),
             ),
             const SizedBox(height: 16),
             FilledButton(

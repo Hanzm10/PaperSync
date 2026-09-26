@@ -188,36 +188,36 @@ class _InkDots extends StatelessWidget {
         for (final color in AppColors.palette)
           Padding(
             padding: const EdgeInsets.only(left: 4),
-            child:           Semantics(
-            button: true,
-            label: _inkName(color),
-            child: InkWell(
-              onTap: () => onColor(color),
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 28,
-                height: 28,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: color.toARGB32() == selected.toARGB32()
-                        ? colors.accent
-                        : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
+            child: Semantics(
+              button: true,
+              label: _inkName(color),
+              child: InkWell(
+                onTap: () => onColor(color),
+                customBorder: const CircleBorder(),
                 child: Container(
-                  width: 16,
-                  height: 16,
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: colors.displayInk(color),
-                    border: Border.all(color: colors.line),
+                    border: Border.all(
+                      color: color.toARGB32() == selected.toARGB32()
+                          ? colors.accent
+                          : Colors.transparent,
+                      width: 2,
+                    ),
+                  ),
+                  child: Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: colors.displayInk(color),
+                      border: Border.all(color: colors.line),
+                    ),
                   ),
                 ),
               ),
-            ),
             ),
           ),
       ],

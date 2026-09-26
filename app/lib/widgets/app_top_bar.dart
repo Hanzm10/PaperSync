@@ -32,8 +32,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         ?overflow,
-        if (link != null)
-          StatusPill(link: link!, onTap: onStatusTap),
+        if (link != null) StatusPill(link: link!, onTap: onStatusTap),
       ],
     );
 
@@ -48,11 +47,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
             child: Row(
               children: [
                 SizedBox(width: 48, child: leading),
-                Expanded(
-                  child: expandTitle
-                      ? title
-                      : Center(child: title),
-                ),
+                Expanded(child: expandTitle ? title : Center(child: title)),
                 trailing,
                 const SizedBox(width: 8),
               ],
@@ -75,9 +70,8 @@ class TopTitle extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-        letterSpacing: -0.4,
-      ),
+      style: Theme.of(context).textTheme.titleMedium
+          ?.copyWith(letterSpacing: -0.4),
     );
   }
 }

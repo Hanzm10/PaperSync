@@ -27,12 +27,8 @@ class StrokePoint {
     );
   }
 
-  StrokePoint copy() => StrokePoint(
-    xMm: xMm,
-    yMm: yMm,
-    pressure: pressure,
-    touching: touching,
-  );
+  StrokePoint copy() =>
+      StrokePoint(xMm: xMm, yMm: yMm, pressure: pressure, touching: touching);
 }
 
 class Stroke {
@@ -80,10 +76,7 @@ class NotebookPage {
   final DateTime createdAt;
   final String recognizedText;
 
-  NotebookPage copyWith({
-    List<Stroke>? strokes,
-    String? recognizedText,
-  }) {
+  NotebookPage copyWith({List<Stroke>? strokes, String? recognizedText}) {
     return NotebookPage(
       id: id,
       pageIndex: pageIndex,

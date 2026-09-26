@@ -45,9 +45,7 @@ class InkPage extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: const Color(0xFF1C1917).withValues(
-              alpha: Theme.of(context).brightness == Brightness.dark
-                  ? 0
-                  : 0.05,
+              alpha: Theme.of(context).brightness == Brightness.dark ? 0 : 0.05,
             ),
             blurRadius: 28,
             offset: const Offset(0, 12),
@@ -125,9 +123,8 @@ class InkSheetPainter extends CustomPainter {
       strokes,
       selectedId: selectedStrokeId,
       accent: accent,
-      resolve: (stored) => stored.toARGB32() == AppColors.storedInk.toARGB32()
-          ? ink
-          : stored,
+      resolve: (stored) =>
+          stored.toARGB32() == AppColors.storedInk.toARGB32() ? ink : stored,
     );
     if (hover != null) paintHover(canvas, size, hover!, accent);
   }

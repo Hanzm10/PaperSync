@@ -38,7 +38,9 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   Widget build(BuildContext context) {
     final model = ref.watch(appControllerProvider);
     final notebook = model.notebook(widget.notebookId);
-    final page = model.livePageId == null ? null : model.page(model.livePageId!);
+    final page = model.livePageId == null
+        ? null
+        : model.page(model.livePageId!);
     if (notebook == null || page == null) {
       return const Scaffold(body: SizedBox.shrink());
     }
@@ -142,13 +144,12 @@ class _PageSlide extends StatelessWidget {
         },
         transitionBuilder: (child, animation) {
           final incoming = child.key == ValueKey(pageId);
-          final begin = incoming
-              ? const Offset(1, 0)
-              : const Offset(-0.2, 0);
+          final begin = incoming ? const Offset(1, 0) : const Offset(-0.2, 0);
           return SlideTransition(
-            position: Tween<Offset>(begin: begin, end: Offset.zero).animate(
-              animation,
-            ),
+            position: Tween<Offset>(
+              begin: begin,
+              end: Offset.zero,
+            ).animate(animation),
             child: child,
           );
         },

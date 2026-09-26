@@ -10,11 +10,8 @@ Future<String?> askName(
 }) {
   return showDialog<String>(
     context: context,
-    builder: (context) => _NameDialog(
-      title: title,
-      initial: initial,
-      confirm: confirm,
-    ),
+    builder: (context) =>
+        _NameDialog(title: title, initial: initial, confirm: confirm),
   );
 }
 
@@ -56,9 +53,8 @@ class _NameDialogState extends State<_NameDialog> {
         textInputAction: TextInputAction.done,
         decoration: InputDecoration(
           hintText: 'Name',
-          hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colors.meta,
-          ),
+          hintStyle: Theme.of(context).textTheme.bodyMedium
+              ?.copyWith(color: colors.meta),
           enabledBorder: UnderlineInputBorder(
             borderSide: BorderSide(color: colors.line),
           ),
@@ -77,7 +73,9 @@ class _NameDialogState extends State<_NameDialog> {
           child: const Text('Cancel'),
         ),
         FilledButton(
-          onPressed: name.isEmpty ? null : () => Navigator.of(context).pop(name),
+          onPressed: name.isEmpty
+              ? null
+              : () => Navigator.of(context).pop(name),
           child: Text(widget.confirm),
         ),
       ],

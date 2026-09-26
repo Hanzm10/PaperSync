@@ -159,9 +159,7 @@ class AppController extends Notifier<AppModel> {
       createdAt: DateTime.now(),
       recognizedText: '',
     );
-    _replaceNotebook(
-      notebook.copyWith(pages: [...notebook.pages, page]),
-    );
+    _replaceNotebook(notebook.copyWith(pages: [...notebook.pages, page]));
     return page.id;
   }
 
@@ -201,7 +199,10 @@ class AppController extends Notifier<AppModel> {
     if (page == null || !history.canUndo) return;
     final previous = history.undo.last;
     final undo = history.undo.sublist(0, history.undo.length - 1);
-    final redo = [...history.redo, page.strokes.map((stroke) => stroke.copy()).toList()];
+    final redo = [
+      ...history.redo,
+      page.strokes.map((stroke) => stroke.copy()).toList(),
+    ];
     _writePage(
       pageId,
       page.copyWith(strokes: previous),
@@ -235,7 +236,10 @@ class AppController extends Notifier<AppModel> {
       current.copyWith(
         strokes: [
           for (final stroke in current.strokes)
-            if (stroke.id == strokeId) stroke.copyWith(color: color) else stroke,
+            if (stroke.id == strokeId)
+              stroke.copyWith(color: color)
+            else
+              stroke,
         ],
       ),
     );
@@ -279,9 +283,7 @@ class AppController extends Notifier<AppModel> {
   }
 
   void grantPermission() {
-    state = state.copyWith(
-      link: state.link.copyWith(permissionGranted: true),
-    );
+    state = state.copyWith(link: state.link.copyWith(permissionGranted: true));
   }
 
   void connectPen(String name) {
@@ -484,12 +486,7 @@ List<_LiveStep> _signatureScript() {
     steps.add(
       _LiveStep(
         _LiveKind.hover,
-        StrokePoint(
-          xMm: 16 + i * 1.5,
-          yMm: 40,
-          pressure: 0,
-          touching: false,
-        ),
+        StrokePoint(xMm: 16 + i * 1.5, yMm: 40, pressure: 0, touching: false),
       ),
     );
   }
@@ -504,12 +501,7 @@ List<_LiveStep> _signatureScript() {
     steps.add(
       _LiveStep(
         _LiveKind.hover,
-        StrokePoint(
-          xMm: 24 + i * 1.2,
-          yMm: 56,
-          pressure: 0,
-          touching: false,
-        ),
+        StrokePoint(xMm: 24 + i * 1.2, yMm: 56, pressure: 0, touching: false),
       ),
     );
   }

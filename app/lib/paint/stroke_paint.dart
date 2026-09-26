@@ -155,10 +155,7 @@ Future<ui.Image> rasterizePage(List<Stroke> strokes, {int width = 1700}) {
   final recorder = ui.PictureRecorder();
   final canvas = Canvas(recorder);
   final size = Size(width.toDouble(), height.toDouble());
-  canvas.drawRect(
-    Offset.zero & size,
-    Paint()..color = const Color(0xFFFFFFFF),
-  );
+  canvas.drawRect(Offset.zero & size, Paint()..color = const Color(0xFFFFFFFF));
   paintStrokes(canvas, size, strokes);
   final picture = recorder.endRecording();
   return picture.toImage(width, height);

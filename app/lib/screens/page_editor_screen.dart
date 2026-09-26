@@ -51,9 +51,9 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
         title: TopTitle('Page ${page.pageIndex}'),
         link: model.link,
         onStatusTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const DeviceScreen()),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute<void>(builder: (_) => const DeviceScreen()));
         },
         overflow: PopupMenuButton<String>(
           tooltip: 'Page actions',

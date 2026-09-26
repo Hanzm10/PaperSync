@@ -15,3 +15,9 @@ cd app
 flutter pub get
 flutter run
 ```
+
+## Storage
+
+On a phone, notebooks are encrypted. The key is created on first launch and kept in the iOS Keychain or the Android Keystore. Android backup is off, so a restore cannot bring the boxes back without that key.
+
+The web demo stores the same boxes in the browser without encryption. It is for trying the app, not for private notes.

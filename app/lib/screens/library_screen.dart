@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ink_models.dart';
 import '../state/app_controller.dart';
+import '../state/notebook_store_provider.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/dialogs.dart';
@@ -20,6 +21,7 @@ class LibraryScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final model = ref.watch(appControllerProvider);
     final controller = ref.read(appControllerProvider.notifier);
+    final notice = ref.watch(storageNoticeProvider);
 
     return Scaffold(
       appBar: AppTopBar(
@@ -36,76 +38,94 @@ class LibraryScreen extends ConsumerWidget {
         link: model.link,
         onStatusTap: () => _openDevice(context),
       ),
-      body: model.notebooks.isEmpty
-          ? _EmptyLibrary(
-              bonded: model.link.bonded,
-              onPrimary: () {
-                if (model.link.bonded) {
-                  unawaited(_createNotebook(context, controller));
-                } else {
-                  _openDevice(context);
-                }
-              },
-            )
-          : Column(
-              children: [
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: Padding(
-                    padding: const EdgeInsets.only(right: 12),
-                    child: TextButton(
-                      onPressed: () => _createNotebook(context, controller),
-                      child: const Text('New notebook'),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final count = constraints.maxWidth >= 1000
-                          ? 4
-                          : constraints.maxWidth >= 700
-                          ? 3
-                          : 2;
-                      const spacing = 28.0;
-                      const padding = 24.0;
-                      final width =
-                          (constraints.maxWidth -
-                              padding * 2 -
-                              spacing * (count - 1)) /
-                          count;
-                      final thumbHeight = width / pageAspect;
-                      final cellHeight = thumbHeight + 58;
-                      return GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: count,
-                          mainAxisSpacing: 28,
-                          crossAxisSpacing: spacing,
-                          childAspectRatio: width / cellHeight,
-                        ),
-                        itemCount: model.notebooks.length,
-                        itemBuilder: (context, index) {
-                          final notebook = model.notebooks[index];
-                          return NotebookCard(
-                            notebook: notebook,
-                            onTap: () {
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => NotebookPagesScreen(
-                                    notebookId: notebook.id,
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
+      body: Column(
+        children: [
+          if (notice != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+              child: Text(
+                notice,
+                key: const Key('storage-notice'),
+                style: Theme.of(context).textTheme.bodyMedium
+                    ?.copyWith(color: context.colors.danger),
+              ),
             ),
+          Expanded(
+            child: model.notebooks.isEmpty
+                ? _EmptyLibrary(
+                    bonded: model.link.bonded,
+                    onPrimary: () {
+                      if (model.link.bonded) {
+                        unawaited(_createNotebook(context, controller));
+                      } else {
+                        _openDevice(context);
+                      }
+                    },
+                  )
+                : Column(
+                    children: [
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(right: 12),
+                          child: TextButton(
+                            onPressed: () =>
+                                _createNotebook(context, controller),
+                            child: const Text('New notebook'),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final count = constraints.maxWidth >= 1000
+                                ? 4
+                                : constraints.maxWidth >= 700
+                                ? 3
+                                : 2;
+                            const spacing = 28.0;
+                            const padding = 24.0;
+                            final width =
+                                (constraints.maxWidth -
+                                    padding * 2 -
+                                    spacing * (count - 1)) /
+                                count;
+                            final thumbHeight = width / pageAspect;
+                            final cellHeight = thumbHeight + 58;
+                            return GridView.builder(
+                              padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: count,
+                                    mainAxisSpacing: 28,
+                                    crossAxisSpacing: spacing,
+                                    childAspectRatio: width / cellHeight,
+                                  ),
+                              itemCount: model.notebooks.length,
+                              itemBuilder: (context, index) {
+                                final notebook = model.notebooks[index];
+                                return NotebookCard(
+                                  notebook: notebook,
+                                  onTap: () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) => NotebookPagesScreen(
+                                          notebookId: notebook.id,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

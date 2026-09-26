@@ -14,8 +14,11 @@ import '../data/sample_notebooks.dart';
 import '../models/ink_models.dart';
 import '../models/pen_link.dart';
 import '../protocol/codec.dart';
+import '../storage/checkpoint_scheduler.dart';
+import '../storage/notebook_store.dart';
 import '../theme/app_colors.dart';
 import 'debug_ink_stats.dart';
+import 'notebook_store_provider.dart';
 import 'pen_transport_provider.dart';
 import 'signal.dart';
 
@@ -139,6 +142,10 @@ class AppController extends Notifier<AppModel> {
   int _windowSamples = 0;
   int _windowNotes = 0;
   bool _historyArmed = false;
+  final Map<String, String> _dirtyMoves = {};
+  final CheckpointScheduler _checkpoints = CheckpointScheduler();
+  late NotebookStore _store;
+  bool _ownsStore = false;
 
   @override
   AppModel build() {
@@ -164,18 +171,46 @@ class AppController extends Notifier<AppModel> {
     ref.onDispose(() {
       _active = false;
       _epoch += 1;
+      _checkpoints.stop();
       unawaited(notes.cancel());
       unawaited(status.cancel());
       unawaited(battery.cancel());
       unawaited(_scanSub?.cancel());
       unawaited(transport.dispose());
+      if (_ownsStore) unawaited(_store.close());
       debugStats.dispose();
     });
-    final initial = _initial ?? AppModel.sample();
-    if (initial.link.permissionGranted && !initial.link.bonded) {
+    final AppModel base;
+    final initial = _initial;
+    if (initial != null) {
+      _store = MemoryNotebookStore(notebooks: initial.notebooks);
+      _ownsStore = true;
+      base = initial;
+    } else {
+      _store = ref.watch(notebookStoreProvider);
+      _ownsStore = false;
+      base = kDebugMode ? AppModel.sample() : AppModel.empty();
+    }
+    if (base.link.permissionGranted && !base.link.bonded) {
       _listenScan();
     }
-    return initial;
+    return base.copyWith(notebooks: _store.current);
+  }
+
+  /// Copies the open stroke into the checkpoint box and flushes it.
+  ///
+  /// Undo history stays in memory. A kill during a stroke keeps the last
+  /// checkpoint, not the undo stack.
+  Future<void> flushOpenStroke() async {
+    if (!_strokeOpen) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null || page.strokes.isEmpty) return;
+    await _store.writeCheckpoint(
+      OpenCheckpoint(pageId: page.id, stroke: page.strokes.last),
+      flush: true,
+    );
+    await _store.flush();
   }
 
   String createNotebook(String name) {
@@ -190,6 +225,7 @@ class AppController extends Notifier<AppModel> {
       createdAt: now,
     );
     state = state.copyWith(notebooks: [notebook, ...state.notebooks]);
+    _persist(_store.createNotebook(notebook));
     return notebook.id;
   }
 
@@ -199,9 +235,13 @@ class AppController extends Notifier<AppModel> {
     state = state.copyWith(
       notebooks: [
         for (final notebook in state.notebooks)
-          if (notebook.id == id) notebook.copyWith(name: trimmed) else notebook,
+          if (notebook.id == id)
+            notebook.copyWith(name: trimmed, syncState: SyncState.pending)
+          else
+            notebook,
       ],
     );
+    _persist(_store.renameNotebook(id, trimmed));
   }
 
   String addPage(String notebookId) {
@@ -221,7 +261,13 @@ class AppController extends Notifier<AppModel> {
       capturedAt: now,
       recognizedText: '',
     );
-    _replaceNotebook(notebook.copyWith(pages: [...notebook.pages, page]));
+    _replaceNotebook(
+      notebook.copyWith(
+        pages: [...notebook.pages, page],
+        syncState: SyncState.pending,
+      ),
+    );
+    _persist(_store.addPage(page));
     return page.id;
   }
 
@@ -237,12 +283,19 @@ class AppController extends Notifier<AppModel> {
           ),
       ],
     );
+    _persist(_store.softDeletePage(pageId));
   }
 
   void setInkColor(String notebookId, Color color) {
     final notebook = state.notebook(notebookId);
     if (notebook == null) return;
-    _replaceNotebook(notebook.copyWith(inkColorArgb: color.toARGB32()));
+    _replaceNotebook(
+      notebook.copyWith(
+        inkColorArgb: color.toARGB32(),
+        syncState: SyncState.pending,
+      ),
+    );
+    _persist(_store.setInkColor(notebookId, color.toARGB32()));
   }
 
   void armHistory(String pageId) {
@@ -253,6 +306,7 @@ class AppController extends Notifier<AppModel> {
 
   void disarmHistory() {
     _historyArmed = false;
+    _commitMoves();
   }
 
   void undo(String pageId) {
@@ -305,6 +359,12 @@ class AppController extends Notifier<AppModel> {
         ],
       ),
     );
+    final saved = state.page(pageId)?.strokes.where((stroke) {
+      return stroke.id == strokeId;
+    });
+    if (saved != null && saved.isNotEmpty) {
+      _persist(_store.upsertStroke(pageId, saved.first));
+    }
   }
 
   void eraseStroke(String pageId, String strokeId) {
@@ -325,6 +385,12 @@ class AppController extends Notifier<AppModel> {
         ],
       ),
     );
+    final saved = state.page(pageId)?.strokes.where((stroke) {
+      return stroke.id == strokeId;
+    });
+    if (saved != null && saved.isNotEmpty) {
+      _persist(_store.upsertStroke(pageId, saved.first));
+    }
   }
 
   void moveStroke(String pageId, String strokeId, Offset deltaMm) {
@@ -335,7 +401,7 @@ class AppController extends Notifier<AppModel> {
         strokes: [
           for (final stroke in page.strokes)
             if (stroke.id == strokeId)
-              stroke.edited(
+              stroke.copyWith(
                 points: [
                   for (final point in stroke.points)
                     point.shift(deltaMm.dx, deltaMm.dy),
@@ -346,6 +412,7 @@ class AppController extends Notifier<AppModel> {
         ],
       ),
     );
+    _dirtyMoves[strokeId] = pageId;
   }
 
   void grantPermission() {
@@ -409,6 +476,7 @@ class AppController extends Notifier<AppModel> {
     final transport = _transport;
     if (transport is SimulatedPenTransport) transport.stop();
     if (!_active) return;
+    _checkpoints.stop();
     for (final event in _machine.disconnect()) {
       _apply(event);
     }
@@ -499,7 +567,13 @@ class AppController extends Notifier<AppModel> {
       case PointAdded(:final point):
         _addPoint(point);
       case StrokeClosed():
+        final pageId = state.livePageId;
+        final page = pageId == null ? null : state.page(pageId);
         _strokeOpen = false;
+        _checkpoints.stop();
+        if (page != null && page.strokes.isNotEmpty) {
+          _persist(_store.saveClosedStroke(page.id, page.strokes.last));
+        }
       case HoverMoved(:final point):
         state = state.copyWith(hover: point);
       case HoverLost():
@@ -539,6 +613,7 @@ class AppController extends Notifier<AppModel> {
     );
     _replacePage(page.copyWith(strokes: [...page.strokes, stroke]));
     _strokeOpen = true;
+    _checkpoints.start(_checkpointTick);
     if (state.hover != null) state = state.copyWith(hover: null);
   }
 
@@ -568,9 +643,12 @@ class AppController extends Notifier<AppModel> {
     final pageId = state.livePageId;
     final page = pageId == null ? null : state.page(pageId);
     if (page == null) return;
-    _replacePage(
-      page.copyWith(markers: [...page.markers, samplesLostMarker(count)]),
+    final saved = page.copyWith(
+      markers: [...page.markers, samplesLostMarker(count)],
+      syncState: SyncState.pending,
     );
+    _replacePage(saved);
+    _persist(_store.savePage(saved));
   }
 
   void _paintLink({required bool saved}) {
@@ -680,6 +758,46 @@ class AppController extends Notifier<AppModel> {
   void _writePage(String pageId, NotebookPage page, PageHistory history) {
     _replacePage(page);
     _setHistory(pageId, history);
+    for (final stroke in page.strokes) {
+      _persist(_store.upsertStroke(pageId, stroke));
+    }
+    _persist(_store.savePage(page));
+  }
+
+  void _commitMoves() {
+    if (_dirtyMoves.isEmpty) return;
+    final pending = Map<String, String>.of(_dirtyMoves);
+    _dirtyMoves.clear();
+    for (final entry in pending.entries) {
+      final pageId = entry.value;
+      final strokeId = entry.key;
+      final page = state.page(pageId);
+      if (page == null) continue;
+      final index = page.strokes.indexWhere((stroke) => stroke.id == strokeId);
+      if (index < 0) continue;
+      final current = page.strokes[index];
+      final saved = current.edited(points: current.points);
+      final strokes = [...page.strokes];
+      strokes[index] = saved;
+      _replacePage(page.copyWith(strokes: strokes));
+      _persist(_store.upsertStroke(pageId, saved));
+    }
+  }
+
+  void _checkpointTick() {
+    if (!_active || !_strokeOpen) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null || page.strokes.isEmpty) return;
+    _persist(
+      _store.writeCheckpoint(
+        OpenCheckpoint(pageId: page.id, stroke: page.strokes.last),
+      ),
+    );
+  }
+
+  void _persist(Future<void> write) {
+    unawaited(write.catchError((Object _) {}));
   }
 
   void _replacePage(NotebookPage page) {

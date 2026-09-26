@@ -8,6 +8,8 @@ import 'package:papersync/theme/app_theme.dart';
 import 'package:papersync/models/ink_models.dart';
 import 'package:papersync/models/pen_link.dart';
 import 'package:papersync/state/app_controller.dart';
+import 'package:papersync/state/notebook_store_provider.dart';
+import 'package:papersync/storage/schema.dart';
 import 'package:papersync/widgets/ink_page.dart';
 
 void main() {
@@ -120,6 +122,21 @@ void main() {
     await tester.tap(find.text('Allow Bluetooth'));
     await tester.pumpAndSettle();
     expect(find.text('PaperSync Pen'), findsOneWidget);
+  });
+
+  testWidgets('a quarantined box tells the reader a copy was kept', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          storageNoticeProvider.overrideWithValue(storageQuarantineNotice),
+        ],
+        child: const PaperSyncApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(storageQuarantineNotice), findsOneWidget);
   });
 
   testWidgets('disconnect and forget regroup the pen controls', (tester) async {

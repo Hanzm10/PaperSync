@@ -1,8 +1,14 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ink_models.dart';
 import '../state/app_controller.dart';
+import '../state/debug_ink_stats.dart';
+import '../state/transport_choice.dart';
+import '../widgets/debug_ink_overlay.dart';
 import '../widgets/ink_page.dart';
 import '../widgets/status_indicators.dart';
 
@@ -30,8 +36,13 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
 
   @override
   void dispose() {
-    _controller?.stopLive();
+    final controller = _controller;
     super.dispose();
+    // stopLive updates app state. Doing that while this element is unmounting
+    // marks a defunct element dirty, so it runs after the route is gone.
+    if (controller != null) {
+      unawaited(Future<void>.microtask(controller.stopLive));
+    }
   }
 
   @override
@@ -84,6 +95,23 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
               ),
             ),
             StatusLine(link: model.link),
+            if (debugOverlayEnabled(
+              debugMode: kDebugMode,
+              releaseMode: kReleaseMode,
+            ))
+              ValueListenableBuilder<DebugInkStats>(
+                valueListenable: _controller!.debugStats,
+                builder: (context, stats, _) => DebugInkOverlay(stats: stats),
+              ),
+            if (page.markers.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
+                child: Text(
+                  page.markers.last,
+                  key: const Key('sample-loss'),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),

@@ -19,6 +19,57 @@ void main() {
     }
     expect(violations, isEmpty);
   });
+
+  test('capture imports only domain and protocol', () {
+    expect(
+      _layerViolations('capture', const ['capture', 'domain', 'protocol']),
+      isEmpty,
+    );
+  });
+
+  test('ble imports only protocol', () {
+    expect(_layerViolations('ble', const ['ble', 'protocol']), isEmpty);
+  });
+}
+
+List<String> _layerViolations(String layer, List<String> allowed) {
+  final violations = <String>[];
+  final dir = Directory('lib/$layer');
+  expect(dir.existsSync(), isTrue, reason: 'missing lib/$layer');
+  for (final entity in dir.listSync(recursive: true)) {
+    if (entity is! File || !entity.path.endsWith('.dart')) continue;
+    for (final uri in _importUris(entity.readAsStringSync())) {
+      if (uri.startsWith('dart:')) continue;
+      if (uri.startsWith('package:') ||
+          !_staysInside(entity.path, uri, allowed)) {
+        violations.add('${entity.path} imports $uri');
+      }
+    }
+  }
+  return violations;
+}
+
+bool _staysInside(String from, String uri, List<String> allowed) {
+  final resolved = File(from).absolute.uri.resolve(uri).toFilePath();
+  final path = _normalize(resolved);
+  for (final folder in allowed) {
+    final root = _normalize(Directory('lib/$folder').absolute.path);
+    if (path == root || path.startsWith('$root/')) return true;
+  }
+  return false;
+}
+
+String _normalize(String path) {
+  final parts = <String>[];
+  for (final part in path.split(Platform.pathSeparator)) {
+    if (part.isEmpty || part == '.') continue;
+    if (part == '..') {
+      if (parts.isNotEmpty) parts.removeLast();
+      continue;
+    }
+    parts.add(part);
+  }
+  return parts.join('/');
 }
 
 final _importUri = RegExp('(?:import|export)\\s+[\'"]([^\'"]+)[\'"]');

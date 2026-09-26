@@ -58,7 +58,9 @@ class SupabaseNotebookRemote implements NotebookRemote {
         'id': row.id,
         'page_id': row.pageId,
         'user_id': row.ownerId,
-        'points': base64Encode(row.points),
+        // A plain base64 string is stored as those characters. Postgres hex
+        // is the form PostgREST writes into bytea.
+        'points': _hexBytes(row.points),
         'time_origin_ms': row.timeOriginMs,
         'color': row.colorArgb,
         'width': row.width,
@@ -191,19 +193,27 @@ class SupabaseNotebookRemote implements NotebookRemote {
 
 SyncFailure _failure(Object error, String table, String id) {
   if (error is SyncFailure) return error;
+  if (error is AuthRetryableFetchException || _isOffline(error)) {
+    return const Offline();
+  }
   if (error is AuthException) return const AuthExpired();
   if (error is PostgrestException) {
     final code = error.code ?? '';
     if (code == 'PGRST301' || code == '401') return const AuthExpired();
-    if (code == '42501' ||
-        code == '23514' ||
-        code == '23503' ||
-        code == '23502' ||
-        code == '23505') {
+    // 23xxx is an integrity constraint. P0001 is the version / user_id trigger.
+    if (code.startsWith('23') || code == '42501' || code == 'P0001') {
       return Rejected(table: table, id: id);
     }
   }
   return const ServerError();
+}
+
+bool _isOffline(Object error) {
+  final text = error.toString();
+  return text.contains('SocketException') ||
+      text.contains('ClientException') ||
+      text.contains('Failed host lookup') ||
+      text.contains('Network is unreachable');
 }
 
 String _idOf(Map<String, Object?> row) {
@@ -246,6 +256,14 @@ double _paper(Object? value, String key, String alternate) {
   final picked = direct ?? fallback;
   if (picked is num) return picked.toDouble();
   return 0;
+}
+
+String _hexBytes(Uint8List bytes) {
+  final hex = StringBuffer(r'\x');
+  for (final byte in bytes) {
+    hex.write(byte.toRadixString(16).padLeft(2, '0'));
+  }
+  return hex.toString();
 }
 
 Uint8List _bytes(Object? value) {

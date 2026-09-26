@@ -64,6 +64,7 @@ class MemoryNotebookStore implements NotebookStore {
   final StreamController<List<Notebook>> _updates =
       StreamController<List<Notebook>>.broadcast();
   String? _currentUserId;
+  String? _homeUserId;
   bool _closed = false;
 
   /// Rows whose owner is neither null nor [userId] stay out of [current].
@@ -253,6 +254,12 @@ class MemoryNotebookStore implements NotebookStore {
     for (final notebook in _notebooks) {
       if (_owners[notebook.id] == null) _owners[notebook.id] = userId;
     }
+    _emit();
+  }
+
+  @override
+  Future<void> rememberHomeUser(String userId) async {
+    _homeUserId = userId;
     _emit();
   }
 
@@ -716,7 +723,8 @@ class MemoryNotebookStore implements NotebookStore {
   }
 
   bool _visible(String? ownerId) {
-    return ownerId == null || ownerId == _currentUserId;
+    if (ownerId == null || ownerId == _currentUserId) return true;
+    return _currentUserId == null && ownerId == _homeUserId;
   }
 }
 

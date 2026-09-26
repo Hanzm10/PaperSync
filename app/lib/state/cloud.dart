@@ -1,12 +1,15 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../platform/connectivity_watch.dart';
 import '../sync/auth.dart';
 import '../sync/backoff.dart';
 import '../sync/failure.dart';
 import '../sync/remote.dart';
 import '../sync/sync_service.dart';
+import 'flutter_test_env.dart';
 import 'notebook_store_provider.dart';
 
 final paperSyncAuthProvider = Provider<PaperSyncAuth>((ref) {
@@ -40,7 +43,7 @@ final backupNoticeProvider = Provider<String?>((ref) {
 /// Starts a backup after a local write, when the app resumes, and again
 /// after a failure. Signed-out installs do nothing.
 class SyncCoordinator {
-  SyncCoordinator(this._ref) {
+  SyncCoordinator(this._ref, {Stream<void>? connectivityRegained}) {
     final auth = _ref.read(paperSyncAuthProvider);
     _accountSub = auth.watchAccount().listen(
       _onAccount,
@@ -53,15 +56,23 @@ class SyncCoordinator {
     if (current != null) {
       unawaited(_onAccount(current));
     }
+    if (connectivityRegained != null) {
+      _onlineSub = connectivityRegained.listen(
+        (_) => unawaited(syncNow()),
+        onError: (Object _) {},
+      );
+    }
   }
 
   final Ref _ref;
   StreamSubscription<SignedInAccount?>? _accountSub;
   StreamSubscription<Object?>? _notesSub;
+  StreamSubscription<void>? _onlineSub;
   Timer? _debounce;
   Timer? _retry;
   int _failures = 0;
   bool _applyingAccount = false;
+  final Random _random = Random();
 
   void onResume() {
     unawaited(syncNow());
@@ -78,9 +89,12 @@ class SyncCoordinator {
     if (status is SyncFailed &&
         (status.reason is ServerError || status.reason is Offline)) {
       _failures += 1;
-      _retry = Timer(syncBackoff(_failures), () {
-        unawaited(syncNow());
-      });
+      _retry = Timer(
+        syncBackoff(_failures, jitterMs: _random.nextInt(1000)),
+        () {
+          unawaited(syncNow());
+        },
+      );
       return;
     }
     if (status is SyncIdle) _failures = 0;
@@ -108,6 +122,7 @@ class SyncCoordinator {
         return;
       }
       await store.claimUnowned(account.id);
+      await store.rememberHomeUser(account.id);
       await store.adoptUser(account.id);
     } finally {
       _applyingAccount = false;
@@ -120,11 +135,15 @@ class SyncCoordinator {
     _retry?.cancel();
     unawaited(_accountSub?.cancel());
     unawaited(_notesSub?.cancel());
+    unawaited(_onlineSub?.cancel());
   }
 }
 
 final syncCoordinatorProvider = Provider<SyncCoordinator>((ref) {
-  final coordinator = SyncCoordinator(ref);
+  final coordinator = SyncCoordinator(
+    ref,
+    connectivityRegained: isFlutterTest ? null : connectivityRegained(),
+  );
   ref.onDispose(coordinator.dispose);
   return coordinator;
 });

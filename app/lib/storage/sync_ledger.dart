@@ -119,6 +119,9 @@ abstract class SyncLedger {
   /// Gives rows with no owner to [userId]. Rows owned by someone else stay.
   Future<void> claimUnowned(String userId);
 
+  /// Notes for [userId] stay in the library after sign-out.
+  Future<void> rememberHomeUser(String userId);
+
   Future<List<NotebookSyncRow>> pendingNotebooks(
     String userId, {
     int limit = 200,

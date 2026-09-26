@@ -49,6 +49,7 @@ abstract final class MetaKeys {
   static const syncCursorStrokes = 'syncCursorStrokes';
   static const syncQuarantine = 'syncQuarantine';
   static const tombstoneSyncedAt = 'tombstoneSyncedAt';
+  static const homeUserId = 'homeUserId';
 }
 
 abstract final class SyncTables {

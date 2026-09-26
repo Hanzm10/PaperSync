@@ -28,6 +28,8 @@ class SyncService {
   final DateTime Function() _now;
 
   static const _pageSize = 500;
+  static const _batchSize = 200;
+  static const _maxPasses = 40;
   static const _tombstoneRetention = Duration(days: 30);
 
   Future<SyncStatus>? _flight;
@@ -85,8 +87,8 @@ class SyncService {
   Future<void> _pushNotebooks(String userId) async {
     var guard = 0;
     while (true) {
-      if (++guard > 8) throw const ServerError();
-      final pending = await ledger.pendingNotebooks(userId);
+      if (++guard > _maxPasses) throw const ServerError();
+      final pending = await ledger.pendingNotebooks(userId, limit: _batchSize);
       final ready = <NotebookSyncRow>[];
       for (final row in pending) {
         if (!isSyncUuid(row.id)) {
@@ -95,27 +97,27 @@ class SyncService {
         }
         ready.add(row);
       }
-      if (ready.isEmpty) return;
+      if (ready.isEmpty) {
+        if (pending.isEmpty) return;
+        continue;
+      }
       try {
         await _call(remote.upsertNotebooks(ready));
       } on Rejected catch (failure) {
         await ledger.quarantine(failure.table, failure.id);
         continue;
       }
-      var editedDuringPush = false;
       for (final row in ready) {
-        final marked = await ledger.markNotebookSynced(row.id, row.version);
-        if (!marked) editedDuringPush = true;
+        await ledger.markNotebookSynced(row.id, row.version);
       }
-      if (!editedDuringPush) return;
     }
   }
 
   Future<void> _pushPages(String userId) async {
     var guard = 0;
     while (true) {
-      if (++guard > 8) throw const ServerError();
-      final pending = await ledger.pendingPages(userId);
+      if (++guard > _maxPasses) throw const ServerError();
+      final pending = await ledger.pendingPages(userId, limit: _batchSize);
       final ready = <PageSyncRow>[];
       for (final row in pending) {
         if (!isSyncUuid(row.id) || !isSyncUuid(row.notebookId)) {
@@ -124,27 +126,27 @@ class SyncService {
         }
         ready.add(row);
       }
-      if (ready.isEmpty) return;
+      if (ready.isEmpty) {
+        if (pending.isEmpty) return;
+        continue;
+      }
       try {
         await _call(remote.upsertPages(ready));
       } on Rejected catch (failure) {
         await ledger.quarantine(failure.table, failure.id);
         continue;
       }
-      var editedDuringPush = false;
       for (final row in ready) {
-        final marked = await ledger.markPageSynced(row.id, row.version);
-        if (!marked) editedDuringPush = true;
+        await ledger.markPageSynced(row.id, row.version);
       }
-      if (!editedDuringPush) return;
     }
   }
 
   Future<void> _pushStrokes(String userId) async {
     var guard = 0;
     while (true) {
-      if (++guard > 8) throw const ServerError();
-      final pending = await ledger.pendingStrokes(userId);
+      if (++guard > _maxPasses) throw const ServerError();
+      final pending = await ledger.pendingStrokes(userId, limit: _batchSize);
       final ready = <StrokeSyncRow>[];
       for (final row in pending) {
         if (!isSyncUuid(row.id) || !isSyncUuid(row.pageId)) {
@@ -153,26 +155,26 @@ class SyncService {
         }
         ready.add(row);
       }
-      if (ready.isEmpty) return;
+      if (ready.isEmpty) {
+        if (pending.isEmpty) return;
+        continue;
+      }
       try {
         await _call(remote.upsertStrokes(ready));
       } on Rejected catch (failure) {
         await ledger.quarantine(failure.table, failure.id);
         continue;
       }
-      var editedDuringPush = false;
       for (final row in ready) {
-        final marked = await ledger.markStrokeSynced(row.id, row.version);
-        if (!marked) editedDuringPush = true;
+        await ledger.markStrokeSynced(row.id, row.version);
       }
-      if (!editedDuringPush) return;
     }
   }
 
   Future<void> _pullNotebooks() async {
     var guard = 0;
     while (true) {
-      if (++guard > 8) throw const ServerError();
+      if (++guard > _maxPasses) throw const ServerError();
       final cursor = await ledger.cursorFor(SyncTables.notebooks);
       final page = await _call(remote.pullNotebooks(after: cursor));
       if (page.isEmpty) return;
@@ -197,7 +199,7 @@ class SyncService {
   Future<void> _pullPages() async {
     var guard = 0;
     while (true) {
-      if (++guard > 8) throw const ServerError();
+      if (++guard > _maxPasses) throw const ServerError();
       final cursor = await ledger.cursorFor(SyncTables.pages);
       final page = await _call(remote.pullPages(after: cursor));
       if (page.isEmpty) return;
@@ -222,7 +224,7 @@ class SyncService {
   Future<void> _pullStrokes() async {
     var guard = 0;
     while (true) {
-      if (++guard > 8) throw const ServerError();
+      if (++guard > _maxPasses) throw const ServerError();
       final cursor = await ledger.cursorFor(SyncTables.strokes);
       final page = await _call(remote.pullStrokes(after: cursor));
       if (page.isEmpty) return;

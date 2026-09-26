@@ -17,6 +17,12 @@ const _notebookId = '11111111-1111-4111-8111-111111111111';
 const _pageId = '22222222-2222-4222-8222-222222222222';
 const _strokeId = '33333333-3333-4333-8333-333333333333';
 const _badId = '44444444-4444-4444-8444-444444444444';
+const _otherNotebook = '55555555-5555-4555-8555-555555555555';
+
+String _batchId(int n) {
+  final tail = n.toRadixString(16).padLeft(12, '0');
+  return '10000000-0000-4000-8000-$tail';
+}
 
 void main() {
   test('a retried push does not duplicate the row', () async {
@@ -133,14 +139,36 @@ void main() {
     expect(remote.notebooks, isEmpty);
   });
 
-  test('signing out leaves the local notebooks in place', () async {
+  test('signing out leaves this account on screen', () async {
     final store = _store();
     await store.createNotebook(_notebook(), ownerId: _user);
+    await store.createNotebook(
+      _notebook(id: _otherNotebook, name: 'Theirs', empty: true),
+      ownerId: _other,
+    );
+    await store.rememberHomeUser(_user);
     await store.adoptUser(_user);
-    expect(store.current, hasLength(1));
+    expect(store.current.map((notebook) => notebook.name), ['Notes']);
     await store.adoptUser(null);
-    expect(store.current, isEmpty);
+    expect(store.current.map((notebook) => notebook.name), ['Notes']);
     expect(store.notebookRow(_notebookId), isNotNull);
+    expect(store.notebookRow(_otherNotebook), isNotNull);
+  });
+
+  test('a push larger than one batch finishes in the same run', () async {
+    final store = _store();
+    final remote = _FakeRemote();
+    for (var i = 0; i < 201; i++) {
+      await store.createNotebook(
+        _notebook(id: _batchId(i), name: 'Batch $i', empty: true),
+        ownerId: _user,
+      );
+    }
+    final status = await _service(store, remote).run();
+    expect(status, isA<SyncIdle>());
+    expect(remote.notebookBatchSizes, [200, 1]);
+    expect(remote.notebooks, hasLength(201));
+    expect(await store.pendingNotebooks(_user), isEmpty);
   });
 
   test('one run is shared until it finishes', () async {
@@ -256,6 +284,7 @@ class _Auth implements PaperSyncAuth {
 
 class _FakeRemote implements NotebookRemote {
   final notebooks = <NotebookSyncRow>[];
+  final notebookBatchSizes = <int>[];
   final order = <String>[];
   final rejectNotebooks = <String>{};
   var failAfterWrite = 0;
@@ -267,6 +296,7 @@ class _FakeRemote implements NotebookRemote {
   @override
   Future<void> upsertNotebooks(List<NotebookSyncRow> rows) async {
     upsertCalls += 1;
+    notebookBatchSizes.add(rows.length);
     if (authFailures > 0) {
       authFailures -= 1;
       throw const AuthExpired();

@@ -25,6 +25,10 @@ class HiveNotebookStore implements NotebookStore {
        _strokesBox = strokes,
        _checkpointBox = checkpoint,
        _metaBox = meta {
+    final savedHome = meta.get(MetaKeys.homeUserId);
+    if (savedHome is String && savedHome.isNotEmpty) {
+      _homeUserId = savedHome;
+    }
     _load();
   }
 
@@ -34,6 +38,7 @@ class HiveNotebookStore implements NotebookStore {
   final Box<StoredCheckpoint> _checkpointBox;
   final Box<Object> _metaBox;
   String? currentUserId;
+  String? _homeUserId;
   final Duration debounce;
 
   final List<Notebook> _notebooks = [];
@@ -500,7 +505,21 @@ class HiveNotebookStore implements NotebookStore {
     return done.future;
   }
 
-  bool _owns(String? ownerId) => ownerId == null || ownerId == currentUserId;
+  bool _owns(String? ownerId) {
+    if (ownerId == null || ownerId == currentUserId) return true;
+    return currentUserId == null && ownerId == _homeUserId;
+  }
+
+  @override
+  Future<void> rememberHomeUser(String userId) {
+    return _enqueue(() async {
+      _homeUserId = userId;
+      await _metaBox.put(MetaKeys.homeUserId, userId);
+      await _metaBox.flush();
+      _load();
+      _emit();
+    });
+  }
 
   @override
   Future<void> adoptUser(String? userId) {

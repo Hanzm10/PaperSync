@@ -23,14 +23,14 @@ class NotebookCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkPage(strokes: latest?.strokes ?? const []),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(
             notebook.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(meta, style: Theme.of(context).textTheme.bodySmall),
         ],
       ),

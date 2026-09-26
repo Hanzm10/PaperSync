@@ -23,7 +23,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   final bool expandTitle;
 
   @override
-  Size get preferredSize => const Size.fromHeight(56);
+  Size get preferredSize => const Size.fromHeight(60);
 
   @override
   Widget build(BuildContext context) {
@@ -42,9 +42,9 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: 56,
+          height: 60,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
             child: Row(
               children: [
                 SizedBox(width: 48, child: leading),
@@ -75,7 +75,9 @@ class TopTitle extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.titleMedium,
+      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+        letterSpacing: -0.4,
+      ),
     );
   }
 }

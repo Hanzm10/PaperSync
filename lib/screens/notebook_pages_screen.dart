@@ -59,16 +59,15 @@ class NotebookPagesScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
         children: [
-          SizedBox(
-            width: double.infinity,
+          Align(
+            alignment: Alignment.centerLeft,
             child: FilledButton(
               key: const Key('live-page-button'),
               onPressed: () {
                 if (connected) {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) =>
-                          LiveCaptureScreen(notebookId: notebookId),
+                      builder: (_) => LiveCaptureScreen(notebookId: notebookId),
                     ),
                   );
                 } else {
@@ -106,8 +105,7 @@ class NotebookPagesScreen extends ConsumerWidget {
   }
 
   void _openDevice(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => const DeviceScreen()),
-    );
+    Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => const DeviceScreen()));
   }
 }

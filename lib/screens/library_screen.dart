@@ -65,20 +65,20 @@ class LibraryScreen extends ConsumerWidget {
                           : constraints.maxWidth >= 700
                           ? 3
                           : 2;
-                      const spacing = 16.0;
-                      const padding = 20.0;
+                      const spacing = 28.0;
+                      const padding = 24.0;
                       final width =
                           (constraints.maxWidth -
                               padding * 2 -
                               spacing * (count - 1)) /
                           count;
                       final thumbHeight = width / pageAspect;
-                      final cellHeight = thumbHeight + 52;
+                      final cellHeight = thumbHeight + 58;
                       return GridView.builder(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: count,
-                          mainAxisSpacing: 20,
+                          mainAxisSpacing: 28,
                           crossAxisSpacing: spacing,
                           childAspectRatio: width / cellHeight,
                         ),

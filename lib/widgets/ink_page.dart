@@ -40,11 +40,22 @@ class InkPage extends StatelessWidget {
     final sheet = DecoratedBox(
       decoration: BoxDecoration(
         color: colors.page,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colors.line),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF1C1917).withValues(
+              alpha: Theme.of(context).brightness == Brightness.dark
+                  ? 0
+                  : 0.05,
+            ),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(11),
         child: CustomPaint(painter: painter, child: const SizedBox.expand()),
       ),
     );

@@ -28,29 +28,29 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color statusDisconnected;
 
   static const light = AppColors(
-    page: Color(0xFFFFFFFF),
-    canvas: Color(0xFFF4F4F5),
-    ink: Color(0xFF1A1A1A),
-    accent: Color(0xFF2563EB),
-    meta: Color(0xFF71717A),
-    line: Color(0xFFE4E4E7),
-    danger: Color(0xFFDC2626),
-    statusSaving: Color(0xFF16A34A),
-    statusReconnecting: Color(0xFFD97706),
-    statusDisconnected: Color(0xFFDC2626),
+    page: Color(0xFFFFFDFC),
+    canvas: Color(0xFFF4F1EC),
+    ink: Color(0xFF1C1917),
+    accent: Color(0xFF1C1917),
+    meta: Color(0xFF8A847C),
+    line: Color(0xFFE6E1D8),
+    danger: Color(0xFF8E3B3B),
+    statusSaving: Color(0xFF3F6B4E),
+    statusReconnecting: Color(0xFF8A6232),
+    statusDisconnected: Color(0xFF8E3B3B),
   );
 
   static const dark = AppColors(
-    page: Color(0xFF1C1C1E),
-    canvas: Color(0xFF000000),
-    ink: Color(0xFFF5F5F5),
-    accent: Color(0xFF2563EB),
-    meta: Color(0xFFA1A1AA),
-    line: Color(0xFF27272A),
-    danger: Color(0xFFF87171),
-    statusSaving: Color(0xFF4ADE80),
-    statusReconnecting: Color(0xFFFBBF24),
-    statusDisconnected: Color(0xFFF87171),
+    page: Color(0xFF171614),
+    canvas: Color(0xFF0E0D0C),
+    ink: Color(0xFFF3F0EA),
+    accent: Color(0xFFF3F0EA),
+    meta: Color(0xFFA39E94),
+    line: Color(0xFF2C2A26),
+    danger: Color(0xFFE7B4B0),
+    statusSaving: Color(0xFF8FBF9E),
+    statusReconnecting: Color(0xFFE0B27A),
+    statusDisconnected: Color(0xFFE7B4B0),
   );
 
   /// Default capture ink. On screen it follows the theme; on export it stays black.

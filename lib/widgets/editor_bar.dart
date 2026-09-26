@@ -157,9 +157,9 @@ class _ToolButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       style: IconButton.styleFrom(
         backgroundColor: selected
-            ? colors.accent.withValues(alpha: 0.12)
+            ? colors.ink.withValues(alpha: 0.06)
             : Colors.transparent,
-        foregroundColor: selected ? colors.accent : colors.ink,
+        foregroundColor: selected ? colors.ink : colors.meta,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
       icon: Icon(icon, size: 20),

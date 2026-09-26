@@ -105,7 +105,7 @@ Future<bool> confirmAction(
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: colors.danger,
-            foregroundColor: Colors.white,
+            foregroundColor: Theme.of(context).colorScheme.onError,
           ),
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(confirm),

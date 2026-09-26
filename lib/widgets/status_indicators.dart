@@ -23,28 +23,32 @@ class StatusPill extends StatelessWidget {
       label: statusSentence(link),
       excludeSemantics: true,
       child: Material(
-        color: tone.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(999),
+        color: colors.page,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(999),
+          side: BorderSide(color: colors.line),
+        ),
         child: InkWell(
           key: const Key('status-pill'),
           onTap: onTap,
           borderRadius: BorderRadius.circular(999),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 8,
-                  height: 8,
+                  width: 6,
+                  height: 6,
                   decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 7),
                 Text(
                   link.shortLabel,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: tone,
+                    color: colors.ink,
                     fontWeight: FontWeight.w500,
+                    letterSpacing: 0,
                   ),
                 ),
                 if (battery != null) ...[
@@ -52,7 +56,8 @@ class StatusPill extends StatelessWidget {
                   Text(
                     '$battery%',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: tone,
+                      color: colors.meta,
+                      letterSpacing: 0,
                     ),
                   ),
                 ],
@@ -89,7 +94,7 @@ class StatusLine extends StatelessWidget {
               statusSentence(link),
               key: const Key('status-line'),
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: tone,
+                color: colors.ink,
               ),
             ),
           ),

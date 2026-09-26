@@ -41,95 +41,125 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.page,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: colors.line),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Text(
-                            link.penName ?? 'Pen',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            link.batteryPercent == null
-                                ? 'Battery unknown'
-                                : '${link.batteryPercent}% battery',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton(
-                              onPressed:
-                                  link.state == LinkState.disconnected
-                                  ? () => controller.connectPen(
-                                      link.penName ?? 'PaperSync Pen',
-                                    )
-                                  : controller.disconnectPen,
-                              child: Text(
-                                link.state == LinkState.disconnected
-                                    ? 'Connect'
-                                    : 'Disconnect',
+                          DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: colors.page,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: colors.line),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    link.penName ?? 'Pen',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    link.batteryPercent == null
+                                        ? 'Battery unknown'
+                                        : '${link.batteryPercent}% battery',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: FilledButton(
+                                      onPressed:
+                                          link.state == LinkState.disconnected
+                                          ? () => controller.connectPen(
+                                              link.penName ?? 'PaperSync Pen',
+                                            )
+                                          : controller.disconnectPen,
+                                      child: Text(
+                                        link.state == LinkState.disconnected
+                                            ? 'Connect'
+                                            : 'Disconnect',
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () =>
+                                setState(() => _detailsOpen = !_detailsOpen),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Connection details',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium,
+                                  ),
+                                  const Spacer(),
+                                  Icon(
+                                    _detailsOpen
+                                        ? Icons.expand_less
+                                        : Icons.expand_more,
+                                    size: 20,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          if (_detailsOpen) ...[
+                            _DetailRow(label: 'Signal', value: link.signal),
+                            _DetailRow(
+                              label: 'Last packet',
+                              value: link.lastPacket == null
+                                  ? 'None'
+                                  : formatTime(link.lastPacket!),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  InkWell(
-                    onTap: () => setState(() => _detailsOpen = !_detailsOpen),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Row(
-                        children: [
-                          Text(
-                            'Connection details',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const Spacer(),
-                          Icon(
-                            _detailsOpen
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (_detailsOpen) ...[
-                    _DetailRow(label: 'Signal', value: link.signal),
-                    _DetailRow(
-                      label: 'Last packet',
-                      value: link.lastPacket == null
-                          ? 'None'
-                          : formatTime(link.lastPacket!),
-                    ),
-                  ],
                   const Spacer(),
-                  TextButton(
-                    onPressed: () async {
-                      final confirmed = await confirmAction(
-                        context,
-                        title: 'Forget this pen?',
-                        message: 'You can pair it again from this screen.',
-                        confirm: 'Forget',
-                      );
-                      if (!confirmed) return;
-                      controller.forgetPen();
-                    },
-                    style: TextButton.styleFrom(foregroundColor: colors.danger),
-                    child: const Text('Forget'),
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 440),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: () async {
+                            final confirmed = await confirmAction(
+                              context,
+                              title: 'Forget this pen?',
+                              message:
+                                  'You can pair it again from this screen.',
+                              confirm: 'Forget',
+                            );
+                            if (!confirmed) return;
+                            controller.forgetPen();
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: colors.danger,
+                          ),
+                          child: const Text('Forget'),
+                        ),
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -172,25 +202,24 @@ class _Pairing extends StatelessWidget {
         ),
         const SizedBox(height: 20),
         if (!permissionGranted)
-          FilledButton(
-            onPressed: onAllow,
-            child: const Text('Allow Bluetooth'),
-          )
+          FilledButton(onPressed: onAllow, child: const Text('Allow Bluetooth'))
         else
           for (final name in nearby)
             InkWell(
               onTap: () => onPick(name),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Text(name, style: Theme.of(context).textTheme.bodyMedium),
+                child: Text(
+                  name,
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
               ),
             ),
         if (permissionGranted && nearby.isEmpty)
           Text(
             'No pens nearby.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.meta,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: colors.meta),
           ),
       ],
     );
@@ -214,9 +243,8 @@ class _DetailRow extends StatelessWidget {
           const Spacer(),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colors.ink,
-            ),
+            style: Theme.of(context).textTheme.bodyMedium
+                ?.copyWith(color: colors.ink),
           ),
         ],
       ),

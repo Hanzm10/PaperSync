@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:papersync/format/labels.dart';
 import 'package:papersync/main.dart';
 import 'package:papersync/theme/app_theme.dart';
@@ -13,10 +12,6 @@ import 'package:papersync/storage/schema.dart';
 import 'package:papersync/widgets/ink_page.dart';
 
 void main() {
-  setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
-  });
-
   test('status copy names the link in plain language', () {
     final saving = PenLink.paired();
     expect(statusSentence(saving), 'Saving · 76% battery');
@@ -113,10 +108,7 @@ void main() {
 
     await tester.tap(find.text('Pair your pen'));
     await tester.pumpAndSettle();
-    expect(
-      find.text('PaperSync connects to the pen that writes on your notebook.'),
-      findsOneWidget,
-    );
+    expect(find.text('Turn on your PaperSync pen'), findsOneWidget);
     expect(find.text('Allow Bluetooth'), findsOneWidget);
 
     await tester.tap(find.text('Allow Bluetooth'));

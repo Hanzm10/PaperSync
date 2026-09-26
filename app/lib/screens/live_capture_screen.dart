@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,8 @@ import '../models/ink_models.dart';
 import '../state/app_controller.dart';
 import '../state/debug_ink_stats.dart';
 import '../state/transport_choice.dart';
+import '../theme/tokens.dart';
+import '../widgets/chrome.dart';
 import '../widgets/debug_ink_overlay.dart';
 import '../widgets/ink_page.dart';
 import '../widgets/status_indicators.dart';
@@ -56,15 +59,21 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
       return const Scaffold(body: SizedBox.shrink());
     }
 
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+    final headerHeight = math.max(PaperTokens.liveHeaderHeight, 36 * scale);
+
     return Scaffold(
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             SizedBox(
-              height: 56,
+              height: headerHeight,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding: const EdgeInsets.only(
+                  left: PaperTokens.space16,
+                  right: PaperTokens.space12,
+                ),
                 child: Row(
                   children: [
                     Expanded(
@@ -80,20 +89,22 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                           ),
                           Text(
                             'Page ${page.pageIndex}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Close',
+                    BarAction(
+                      label: 'Close',
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close),
                     ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: PaperTokens.space12),
             StatusLine(link: model.link),
             if (debugOverlayEnabled(
               debugMode: kDebugMode,
@@ -105,16 +116,27 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
               ),
             if (page.markers.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 4),
+                padding: const EdgeInsets.fromLTRB(
+                  PaperTokens.space24,
+                  PaperTokens.space4,
+                  PaperTokens.space24,
+                  0,
+                ),
                 child: Text(
                   page.markers.last,
                   key: const Key('sample-loss'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
+            const SizedBox(height: PaperTokens.space12),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                padding: const EdgeInsets.fromLTRB(
+                  PaperTokens.space24,
+                  0,
+                  PaperTokens.space24,
+                  PaperTokens.space24,
+                ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final fitted = _fitSheet(constraints);

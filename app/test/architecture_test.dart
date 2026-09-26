@@ -41,6 +41,24 @@ void main() {
       isEmpty,
     );
   });
+
+  test('screens and widgets do not import ble, capture, storage, or sync', () {
+    const forbidden = ['ble', 'capture', 'storage', 'sync'];
+    final violations = <String>[];
+    for (final layer in ['screens', 'widgets']) {
+      final dir = Directory('lib/$layer');
+      expect(dir.existsSync(), isTrue, reason: 'missing lib/$layer');
+      for (final entity in dir.listSync(recursive: true)) {
+        if (entity is! File || !entity.path.endsWith('.dart')) continue;
+        for (final uri in _importUris(entity.readAsStringSync())) {
+          if (_importsLayer(entity.path, uri, forbidden)) {
+            violations.add('${entity.path} imports $uri');
+          }
+        }
+      }
+    }
+    expect(violations, isEmpty);
+  });
 }
 
 List<String> _storageViolations() {
@@ -108,6 +126,27 @@ Iterable<String> _importUris(String source) sync* {
     final match = _importUri.firstMatch(code);
     if (match != null) yield match.group(1)!;
   }
+}
+
+bool _importsLayer(String from, String uri, List<String> layers) {
+  if (uri.startsWith('dart:')) return false;
+  if (uri.startsWith('package:') && !uri.startsWith('package:papersync/')) {
+    return false;
+  }
+  final String path;
+  if (uri.startsWith('package:papersync/')) {
+    path = 'lib/${uri.substring('package:papersync/'.length)}';
+  } else {
+    path = _normalize(File(from).absolute.uri.resolve(uri).toFilePath());
+  }
+  final normalized = path.replaceAll('\\', '/');
+  for (final layer in layers) {
+    if (normalized.contains('/lib/$layer/') ||
+        normalized.startsWith('lib/$layer/')) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool _forbidden(String uri) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../format/labels.dart';
 import '../models/pen_link.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 
 class StatusPill extends StatelessWidget {
   const StatusPill({super.key, required this.link, this.onTap});
@@ -18,52 +19,60 @@ class StatusPill extends StatelessWidget {
         ? null
         : link.batteryPercent;
 
+    final pill = DecoratedBox(
+      decoration: BoxDecoration(
+        color: colors.page,
+        borderRadius: BorderRadius.circular(PaperTokens.radiusPill),
+        border: Border.all(color: colors.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: PaperTokens.space10,
+          vertical: 5,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: PaperTokens.statusDot,
+              height: PaperTokens.statusDot,
+              decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: PaperTokens.space7),
+            Text(
+              link.shortLabel,
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: colors.ink, fontWeight: FontWeight.w500),
+            ),
+            if (battery != null) ...[
+              const SizedBox(width: PaperTokens.space6),
+              Text(
+                '$battery%',
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: colors.meta),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
     return Semantics(
       button: onTap != null,
       label: statusSentence(link),
       excludeSemantics: true,
       child: Material(
-        color: colors.page,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(999),
-          side: BorderSide(color: colors.line),
-        ),
+        type: MaterialType.transparency,
         child: InkWell(
           key: const Key('status-pill'),
           onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: tone,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 7),
-                Text(
-                  link.shortLabel,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colors.ink,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0,
-                  ),
-                ),
-                if (battery != null) ...[
-                  const SizedBox(width: 6),
-                  Text(
-                    '$battery%',
-                    style: Theme.of(context).textTheme.bodySmall
-                        ?.copyWith(color: colors.meta, letterSpacing: 0),
-                  ),
-                ],
-              ],
+          borderRadius: BorderRadius.circular(PaperTokens.radiusPill),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(
+              minWidth: PaperTokens.minTap,
+              minHeight: PaperTokens.minTap,
             ),
+            child: Center(child: pill),
           ),
         ),
       ),
@@ -81,21 +90,22 @@ class StatusLine extends StatelessWidget {
     final colors = context.colors;
     final tone = colors.statusColor(link.tone);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      padding: const EdgeInsets.symmetric(horizontal: PaperTokens.space24),
       child: Row(
         children: [
           Container(
-            width: 8,
-            height: 8,
+            width: PaperTokens.statusDotLive,
+            height: PaperTokens.statusDotLive,
             decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: PaperTokens.space8),
           Expanded(
             child: Text(
               statusSentence(link),
               key: const Key('status-line'),
-              style: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: colors.ink),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium,
             ),
           ),
         ],

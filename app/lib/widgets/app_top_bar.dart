@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/pen_link.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 import 'status_indicators.dart';
 
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
@@ -23,7 +24,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   final bool expandTitle;
 
   @override
-  Size get preferredSize => const Size.fromHeight(60);
+  Size get preferredSize => const Size.fromHeight(PaperTokens.barHeight);
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +33,8 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         ?overflow,
+        if (overflow != null && link != null)
+          const SizedBox(width: PaperTokens.space8),
         if (link != null) StatusPill(link: link!, onTap: onStatusTap),
       ],
     );
@@ -41,15 +44,37 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       child: SafeArea(
         bottom: false,
         child: SizedBox(
-          height: 60,
+          height: PaperTokens.barHeight,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: const EdgeInsets.symmetric(
+              horizontal: PaperTokens.space12,
+            ),
             child: Row(
               children: [
-                SizedBox(width: 48, child: leading),
-                Expanded(child: expandTitle ? title : Center(child: title)),
-                trailing,
-                const SizedBox(width: 8),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: leading ?? const SizedBox.shrink(),
+                  ),
+                ),
+                Expanded(
+                  flex: expandTitle ? 3 : 2,
+                  child: expandTitle
+                      ? title
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [Flexible(child: title)],
+                        ),
+                ),
+                Flexible(
+                  flex: 2,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: trailing,
+                  ),
+                ),
               ],
             ),
           ),
@@ -70,8 +95,8 @@ class TopTitle extends StatelessWidget {
       text,
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: Theme.of(context).textTheme.titleMedium
-          ?.copyWith(letterSpacing: -0.4),
+      textAlign: TextAlign.center,
+      style: Theme.of(context).textTheme.titleMedium,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 
 Future<String?> askName(
   BuildContext context, {
@@ -43,29 +44,23 @@ class _NameDialogState extends State<_NameDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = context.colors;
     final name = _controller.text.trim();
     return AlertDialog(
       title: Text(widget.title),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        textInputAction: TextInputAction.done,
-        decoration: InputDecoration(
-          hintText: 'Name',
-          hintStyle: Theme.of(context).textTheme.bodyMedium
-              ?.copyWith(color: colors.meta),
-          enabledBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: colors.line),
-          ),
-          focusedBorder: UnderlineInputBorder(
-            borderSide: BorderSide(color: colors.accent),
-          ),
+      content: Semantics(
+        label: 'Name',
+        textField: true,
+        child: TextField(
+          controller: _controller,
+          autofocus: true,
+          textInputAction: TextInputAction.done,
+          decoration: const InputDecoration(hintText: 'Name'),
+          onChanged: (_) => setState(() {}),
+          onSubmitted: (_) {
+            if (name.isEmpty) return;
+            Navigator.of(context).pop(name);
+          },
         ),
-        onChanged: (_) => setState(() {}),
-        onSubmitted: (_) {
-          if (name.isNotEmpty) Navigator.of(context).pop(name);
-        },
       ),
       actions: [
         TextButton(
@@ -103,7 +98,8 @@ Future<bool> confirmAction(
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: colors.danger,
-            foregroundColor: Theme.of(context).colorScheme.onError,
+            foregroundColor: colors.onAccent,
+            minimumSize: const Size(PaperTokens.minTap, PaperTokens.minTap),
           ),
           onPressed: () => Navigator.of(context).pop(true),
           child: Text(confirm),

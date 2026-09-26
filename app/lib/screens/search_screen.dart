@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/ink_models.dart';
 import '../state/app_controller.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/chrome.dart';
 import '../widgets/ink_page.dart';
 import 'device_screen.dart';
 import 'page_editor_screen.dart';
@@ -38,24 +40,31 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Scaffold(
       appBar: AppTopBar(
         expandTitle: true,
-        leading: IconButton(
-          tooltip: 'Back',
+        leading: BarAction(
+          label: 'Back',
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back),
         ),
-        title: TextField(
-          controller: _query,
-          autofocus: true,
-          textInputAction: TextInputAction.search,
-          style: Theme.of(context).textTheme.bodyMedium,
-          decoration: InputDecoration(
-            hintText: 'Search handwriting',
-            hintStyle: Theme.of(context).textTheme.bodyMedium
-                ?.copyWith(color: colors.meta),
-            border: InputBorder.none,
-            isCollapsed: true,
+        title: Semantics(
+          label: 'Search handwriting',
+          textField: true,
+          child: TextField(
+            controller: _query,
+            autofocus: true,
+            textInputAction: TextInputAction.search,
+            style: Theme.of(context).textTheme.bodyMedium,
+            decoration: InputDecoration(
+              hintText: 'Search handwriting',
+              hintStyle: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colors.meta),
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              isCollapsed: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+            onChanged: (_) => setState(() {}),
           ),
-          onChanged: (_) => setState(() {}),
         ),
         link: model.link,
         onStatusTap: () {
@@ -78,7 +87,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     if (indexed.isEmpty) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.all(PaperTokens.space32),
           child: Text(
             'Search reads your handwriting after a page is saved.',
             textAlign: TextAlign.center,
@@ -99,7 +108,12 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
       );
     }
     return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 24),
+      padding: const EdgeInsets.fromLTRB(
+        PaperTokens.space8,
+        PaperTokens.space8,
+        PaperTokens.space16,
+        PaperTokens.space24,
+      ),
       itemCount: results.length,
       separatorBuilder: (context, index) =>
           Divider(height: 1, color: colors.line),
@@ -117,7 +131,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             );
           },
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+            padding: const EdgeInsets.symmetric(
+              horizontal: PaperTokens.space8,
+              vertical: PaperTokens.space12,
+            ),
             child: Row(
               children: [
                 SizedBox(width: 96, child: InkPage(strokes: hit.page.strokes)),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/ink_models.dart';
 import '../paint/stroke_paint.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 
 class InkPage extends StatelessWidget {
   const InkPage({
@@ -40,20 +41,11 @@ class InkPage extends StatelessWidget {
     final sheet = DecoratedBox(
       decoration: BoxDecoration(
         color: colors.page,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(PaperTokens.radiusCard),
         border: Border.all(color: colors.line),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1C1917).withValues(
-              alpha: Theme.of(context).brightness == Brightness.dark ? 0 : 0.05,
-            ),
-            blurRadius: 28,
-            offset: const Offset(0, 12),
-          ),
-        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(11),
+        borderRadius: BorderRadius.circular(PaperTokens.radiusCard - 1),
         child: CustomPaint(painter: painter, child: const SizedBox.expand()),
       ),
     );

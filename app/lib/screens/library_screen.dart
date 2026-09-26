@@ -8,12 +8,16 @@ import '../state/app_controller.dart';
 import '../state/cloud.dart';
 import '../state/notebook_store_provider.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/notebook_card.dart';
+import '../widgets/paper_svg.dart';
 import 'device_screen.dart';
 import 'notebook_pages_screen.dart';
 import 'search_screen.dart';
+import 'sync_issue_screen.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
@@ -27,14 +31,14 @@ class LibraryScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppTopBar(
-        leading: IconButton(
+        leading: BarAction(
+          label: 'Search',
           tooltip: 'Search',
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const SearchScreen()),
             );
           },
-          icon: const Icon(Icons.search),
         ),
         title: const TopTitle('Library'),
         link: model.link,
@@ -43,24 +47,21 @@ class LibraryScreen extends ConsumerWidget {
       body: Column(
         children: [
           if (notice != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-              child: Text(
-                notice,
-                key: const Key('storage-notice'),
-                style: Theme.of(context).textTheme.bodyMedium
-                    ?.copyWith(color: context.colors.danger),
-              ),
+            NoticeBanner(
+              message: notice,
+              messageKey: const Key('storage-notice'),
             ),
           if (backup != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-              child: Text(
-                backup,
-                key: const Key('backup-notice'),
-                style: Theme.of(context).textTheme.bodyMedium
-                    ?.copyWith(color: context.colors.danger),
-              ),
+            NoticeBanner(
+              message: backup,
+              messageKey: const Key('backup-notice'),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const SyncIssueScreen(),
+                  ),
+                );
+              },
             ),
           Expanded(
             child: model.notebooks.isEmpty
@@ -76,10 +77,13 @@ class LibraryScreen extends ConsumerWidget {
                   )
                 : Column(
                     children: [
+                      const SizedBox(height: PaperTokens.space12),
                       Align(
                         alignment: Alignment.centerRight,
                         child: Padding(
-                          padding: const EdgeInsets.only(right: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: PaperTokens.space24,
+                          ),
                           child: TextButton(
                             onPressed: () =>
                                 _createNotebook(context, controller),
@@ -95,23 +99,32 @@ class LibraryScreen extends ConsumerWidget {
                                 : constraints.maxWidth >= 700
                                 ? 3
                                 : 2;
-                            const spacing = 28.0;
-                            const padding = 24.0;
+                            const spacing = PaperTokens.space16;
                             final width =
                                 (constraints.maxWidth -
-                                    padding * 2 -
+                                    PaperTokens.space24 * 2 -
                                     spacing * (count - 1)) /
                                 count;
-                            final thumbHeight = width / pageAspect;
-                            final cellHeight = thumbHeight + 58;
+                            final scaler = MediaQuery.textScalerOf(context);
+                            final textBlock =
+                                PaperTokens.space10 +
+                                scaler.scale(22) +
+                                PaperTokens.space10 +
+                                scaler.scale(18);
+                            final extent = width / pageAspect + textBlock;
                             return GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(24, 4, 24, 32),
+                              padding: const EdgeInsets.fromLTRB(
+                                PaperTokens.space24,
+                                PaperTokens.space4,
+                                PaperTokens.space24,
+                                PaperTokens.space32,
+                              ),
                               gridDelegate:
                                   SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: count,
-                                    mainAxisSpacing: 28,
+                                    mainAxisSpacing: PaperTokens.space24,
                                     crossAxisSpacing: spacing,
-                                    childAspectRatio: width / cellHeight,
+                                    mainAxisExtent: extent,
                                   ),
                               itemCount: model.notebooks.length,
                               itemBuilder: (context, index) {
@@ -172,11 +185,13 @@ class _EmptyLibrary extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = context.colors;
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(PaperTokens.space32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const PaperSvg.inkPreview(),
+            const SizedBox(height: PaperTokens.space24),
             Text(
               bonded
                   ? 'Notebooks you write show up here.'
@@ -185,10 +200,10 @@ class _EmptyLibrary extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: colors.meta),
             ),
-            const SizedBox(height: 16),
-            FilledButton(
+            const SizedBox(height: PaperTokens.space16),
+            PrimaryButton(
+              label: bonded ? 'New notebook' : 'Pair your pen',
               onPressed: onPrimary,
-              child: Text(bonded ? 'New notebook' : 'Pair your pen'),
             ),
           ],
         ),

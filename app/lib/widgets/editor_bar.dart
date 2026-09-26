@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/ink_models.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
 
 class EditorBar extends StatelessWidget {
   const EditorBar({
@@ -28,6 +29,7 @@ class EditorBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
+    final width = MediaQuery.sizeOf(context).width;
     return Material(
       color: colors.canvas,
       child: DecoratedBox(
@@ -36,56 +38,63 @@ class EditorBar extends StatelessWidget {
         ),
         child: SafeArea(
           top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(8, 6, 12, 6),
-            child: Row(
-              children: [
-                _Cluster(
-                  key: const Key('history-cluster'),
-                  children: [
-                    _BarButton(
-                      tooltip: 'Undo',
-                      icon: Icons.undo,
-                      onPressed: canUndo ? onUndo : null,
-                    ),
-                    _BarButton(
-                      tooltip: 'Redo',
-                      icon: Icons.redo,
-                      onPressed: canRedo ? onRedo : null,
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                _Cluster(
-                  key: const Key('stroke-tools'),
-                  children: [
-                    _ToolButton(
-                      tooltip: 'Select',
-                      icon: Icons.near_me_outlined,
-                      selected: tool == EditorTool.select,
-                      onPressed: () => onTool(EditorTool.select),
-                    ),
-                    _ToolButton(
-                      tooltip: 'Move',
-                      icon: Icons.open_with,
-                      selected: tool == EditorTool.move,
-                      onPressed: () => onTool(EditorTool.move),
-                    ),
-                    _ToolButton(
-                      tooltip: 'Erase',
-                      icon: Icons.auto_fix_off,
-                      selected: tool == EditorTool.erase,
-                      onPressed: () => onTool(EditorTool.erase),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                _InkDots(
-                  key: const Key('ink-dots'),
-                  selected: inkColor,
-                  onColor: onColor,
-                ),
-              ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(
+              PaperTokens.space10,
+              PaperTokens.space10,
+              PaperTokens.space12,
+              PaperTokens.space16,
+            ),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: width - PaperTokens.space10 - PaperTokens.space12,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _Cluster(
+                    key: const Key('history-cluster'),
+                    children: [
+                      _ToolButton(
+                        label: 'Undo',
+                        enabled: canUndo,
+                        onPressed: onUndo,
+                      ),
+                      _ToolButton(
+                        label: 'Redo',
+                        enabled: canRedo,
+                        onPressed: onRedo,
+                      ),
+                    ],
+                  ),
+                  _Cluster(
+                    key: const Key('stroke-tools'),
+                    children: [
+                      _ToolButton(
+                        label: 'Select',
+                        selected: tool == EditorTool.select,
+                        onPressed: () => onTool(EditorTool.select),
+                      ),
+                      _ToolButton(
+                        label: 'Move',
+                        selected: tool == EditorTool.move,
+                        onPressed: () => onTool(EditorTool.move),
+                      ),
+                      _ToolButton(
+                        label: 'Erase',
+                        selected: tool == EditorTool.erase,
+                        onPressed: () => onTool(EditorTool.erase),
+                      ),
+                    ],
+                  ),
+                  _InkDots(
+                    key: const Key('ink-dots'),
+                    selected: inkColor,
+                    onColor: onColor,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -105,64 +114,68 @@ class _Cluster extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colors.page,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(PaperTokens.radiusCluster),
         border: Border.all(color: colors.line),
       ),
-      child: Row(mainAxisSize: MainAxisSize.min, children: children),
-    );
-  }
-}
-
-class _BarButton extends StatelessWidget {
-  const _BarButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
-  });
-
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      icon: Icon(icon, size: 20),
-      visualDensity: VisualDensity.compact,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: PaperTokens.space6,
+          vertical: PaperTokens.space4,
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: children),
+      ),
     );
   }
 }
 
 class _ToolButton extends StatelessWidget {
   const _ToolButton({
-    required this.tooltip,
-    required this.icon,
-    required this.selected,
+    required this.label,
     required this.onPressed,
+    this.selected = false,
+    this.enabled = true,
   });
 
-  final String tooltip;
-  final IconData icon;
+  final String label;
+  final VoidCallback? onPressed;
   final bool selected;
-  final VoidCallback onPressed;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    return IconButton(
-      tooltip: tooltip,
-      onPressed: onPressed,
-      visualDensity: VisualDensity.compact,
-      style: IconButton.styleFrom(
-        backgroundColor: selected
-            ? colors.ink.withValues(alpha: 0.06)
-            : Colors.transparent,
-        foregroundColor: selected ? colors.ink : colors.meta,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    final active = enabled && onPressed != null;
+    final color = !active
+        ? colors.meta.withValues(alpha: 0.45)
+        : selected
+        ? colors.ink
+        : colors.meta;
+    return Semantics(
+      button: true,
+      selected: selected,
+      enabled: active,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: TextButton(
+          onPressed: active ? onPressed : null,
+          style: TextButton.styleFrom(
+            foregroundColor: color,
+            disabledForegroundColor: color,
+            backgroundColor: selected
+                ? colors.ink.withValues(alpha: 0.06)
+                : Colors.transparent,
+            textStyle: Theme.of(context).textTheme.labelSmall,
+            minimumSize: const Size(40, PaperTokens.minTap),
+            padding: const EdgeInsets.symmetric(horizontal: PaperTokens.space8),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
+            ),
+          ),
+          child: Text(label),
+        ),
       ),
-      icon: Icon(icon, size: 20),
     );
   }
 }
@@ -186,34 +199,41 @@ class _InkDots extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         for (final color in AppColors.palette)
-          Padding(
-            padding: const EdgeInsets.only(left: 4),
-            child: Semantics(
-              button: true,
-              label: _inkName(color),
+          Semantics(
+            button: true,
+            selected: color.toARGB32() == selected.toARGB32(),
+            label: _inkName(color),
+            child: Tooltip(
+              message: _inkName(color),
               child: InkWell(
                 onTap: () => onColor(color),
                 customBorder: const CircleBorder(),
-                child: Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: color.toARGB32() == selected.toARGB32()
-                          ? colors.accent
-                          : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                  child: Container(
-                    width: 16,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: colors.displayInk(color),
-                      border: Border.all(color: colors.line),
+                child: SizedBox(
+                  width: 36,
+                  height: PaperTokens.minTap,
+                  child: Center(
+                    child: Container(
+                      width: PaperTokens.inkDot + 6,
+                      height: PaperTokens.inkDot + 6,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: color.toARGB32() == selected.toARGB32()
+                              ? colors.accent
+                              : Colors.transparent,
+                          width: 2,
+                        ),
+                      ),
+                      child: Container(
+                        width: PaperTokens.inkDot,
+                        height: PaperTokens.inkDot,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: colors.displayInk(color),
+                          border: Border.all(color: colors.line),
+                        ),
+                      ),
                     ),
                   ),
                 ),

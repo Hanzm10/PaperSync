@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../format/labels.dart';
 import '../models/ink_models.dart';
+import '../theme/tokens.dart';
 import 'ink_page.dart';
 
 class NotebookCard extends StatelessWidget {
@@ -18,20 +19,25 @@ class NotebookCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           InkPage(strokes: latest?.strokes ?? const []),
-          const SizedBox(height: 12),
+          const SizedBox(height: PaperTokens.space10),
           Text(
             notebook.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleSmall,
           ),
-          const SizedBox(height: 3),
-          Text(meta, style: Theme.of(context).textTheme.bodySmall),
+          const SizedBox(height: PaperTokens.space10),
+          Text(
+            meta,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ],
       ),
     );

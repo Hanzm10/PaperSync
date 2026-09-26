@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:papersync/ble/simulated_pen_transport.dart';
 import 'package:papersync/domain/ink.dart';
 import 'package:papersync/models/pen_link.dart';
@@ -12,10 +11,6 @@ import 'package:papersync/state/pen_transport_provider.dart';
 import 'package:papersync/theme/app_theme.dart';
 
 void main() {
-  setUpAll(() {
-    GoogleFonts.config.allowRuntimeFetching = false;
-  });
-
   test('a seq gap leaves an N samples lost marker on the page', () async {
     final transport = SimulatedPenTransport(
       clock: () => DateTime.utc(2026, 9, 26),

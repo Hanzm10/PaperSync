@@ -2,8 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../sync/auth.dart';
 import '../theme/app_colors.dart';
+import '../theme/tokens.dart';
+
+final RegExp _email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+bool _isEmailAddress(String value) => _email.hasMatch(value.trim());
 
 /// Email code sign-in. A resend is allowed 60 seconds after the last send.
 Future<void> showSignInSheet(
@@ -11,9 +15,16 @@ Future<void> showSignInSheet(
   required Future<void> Function(String email) sendCode,
   required Future<void> Function(String email, String code) verifyCode,
 }) {
+  final colors = Theme.of(context).extension<AppColors>()!;
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
+    backgroundColor: colors.page,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(PaperTokens.radiusCard),
+      ),
+    ),
     builder: (context) {
       return _SignInSheet(sendCode: sendCode, verifyCode: verifyCode);
     },
@@ -31,7 +42,7 @@ class _SignInSheet extends StatefulWidget {
 }
 
 class _SignInSheetState extends State<_SignInSheet> {
-  final TextEditingController _email = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _code = TextEditingController();
   Timer? _resend;
   var _secondsLeft = 0;
@@ -42,7 +53,7 @@ class _SignInSheetState extends State<_SignInSheet> {
   @override
   void dispose() {
     _resend?.cancel();
-    _email.dispose();
+    _emailController.dispose();
     _code.dispose();
     super.dispose();
   }
@@ -51,8 +62,13 @@ class _SignInSheetState extends State<_SignInSheet> {
   Widget build(BuildContext context) {
     final colors = context.colors;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 16, 20, 16 + bottom),
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        PaperTokens.space24,
+        PaperTokens.space16,
+        PaperTokens.space24,
+        PaperTokens.space16 + bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -61,42 +77,39 @@ class _SignInSheetState extends State<_SignInSheet> {
             'Back up notebooks',
             style: Theme.of(context).textTheme.titleMedium,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: PaperTokens.space8),
           Text(
             'We email a 6-digit code. Notes stay on this phone either way.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _email,
+          const SizedBox(height: PaperTokens.space16),
+          _Field(
+            label: 'Email',
+            hint: 'name@example.com',
+            controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            autocorrect: false,
             enabled: !_codeSent,
-            decoration: InputDecoration(
-              hintText: 'Email',
-              hintStyle: Theme.of(context).textTheme.bodyMedium
-                  ?.copyWith(color: colors.meta),
-            ),
             onChanged: (_) => setState(() {}),
           ),
           if (_codeSent) ...[
-            const SizedBox(height: 12),
-            TextField(
+            const SizedBox(height: PaperTokens.space12),
+            _Field(
+              label: 'Code',
+              hint: '6-digit code',
               controller: _code,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(hintText: '6-digit code'),
               onChanged: (_) => setState(() {}),
             ),
           ],
           if (_message.isNotEmpty) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: PaperTokens.space8),
             Text(
               _message,
               style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(color: colors.danger),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: PaperTokens.space16),
           FilledButton(
             onPressed: _busy ? null : _submit,
             child: Text(_codeSent ? 'Verify' : 'Send code'),
@@ -122,8 +135,8 @@ class _SignInSheetState extends State<_SignInSheet> {
   }
 
   Future<void> _send() async {
-    final email = _email.text.trim();
-    if (!isEmailAddress(email)) {
+    final email = _emailController.text.trim();
+    if (!_isEmailAddress(email)) {
       setState(() => _message = 'Enter an email address.');
       return;
     }
@@ -168,7 +181,7 @@ class _SignInSheetState extends State<_SignInSheet> {
       _message = '';
     });
     try {
-      await widget.verifyCode(_email.text.trim(), code);
+      await widget.verifyCode(_emailController.text.trim(), code);
       if (!mounted) return;
       Navigator.of(context).pop();
     } on Object {
@@ -177,5 +190,52 @@ class _SignInSheetState extends State<_SignInSheet> {
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+}
+
+class _Field extends StatelessWidget {
+  const _Field({
+    required this.label,
+    required this.hint,
+    required this.controller,
+    required this.onChanged,
+    this.keyboardType,
+    this.enabled = true,
+  });
+
+  final String label;
+  final String hint;
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final TextInputType? keyboardType;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelMedium),
+        const SizedBox(height: PaperTokens.space8),
+        Semantics(
+          label: label,
+          textField: true,
+          child: TextField(
+            controller: controller,
+            keyboardType: keyboardType,
+            autocorrect: false,
+            enabled: enabled,
+            style: Theme.of(context).textTheme.bodyMedium,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: Theme.of(context).textTheme.bodyMedium
+                  ?.copyWith(color: colors.meta),
+            ),
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
   }
 }

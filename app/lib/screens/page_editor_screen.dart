@@ -5,7 +5,9 @@ import '../export/page_export.dart';
 import '../models/ink_models.dart';
 import '../paint/stroke_paint.dart';
 import '../state/app_controller.dart';
+import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/editor_bar.dart';
 import '../widgets/ink_page.dart';
@@ -43,10 +45,9 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
 
     return Scaffold(
       appBar: AppTopBar(
-        leading: IconButton(
-          tooltip: 'Back',
+        leading: BarAction(
+          label: 'Back',
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back),
         ),
         title: TopTitle('Page ${page.pageIndex}'),
         link: model.link,
@@ -55,9 +56,8 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
             context,
           ).push(MaterialPageRoute<void>(builder: (_) => const DeviceScreen()));
         },
-        overflow: PopupMenuButton<String>(
+        overflow: BarMenu(
           tooltip: 'Page actions',
-          icon: const Icon(Icons.more_horiz),
           onSelected: (value) => _onMenu(context, controller, page, value),
           itemBuilder: (context) => [
             const PopupMenuItem(value: 'pdf', child: Text('Export PDF')),
@@ -76,7 +76,12 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
         children: [
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+              padding: const EdgeInsets.fromLTRB(
+                PaperTokens.space20,
+                PaperTokens.space12,
+                PaperTokens.space20,
+                PaperTokens.space12,
+              ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final fitted = _fit(constraints);

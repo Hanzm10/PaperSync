@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
+import 'tokens.dart';
 
 class AppTheme {
   static ThemeData light() => _build(AppColors.light, Brightness.light);
@@ -9,57 +9,48 @@ class AppTheme {
   static ThemeData dark() => _build(AppColors.dark, Brightness.dark);
 
   static ThemeData _build(AppColors colors, Brightness brightness) {
-    final onAccent = brightness == Brightness.light
-        ? const Color(0xFFFFFDFC)
-        : const Color(0xFF1C1917);
     final scheme = ColorScheme(
       brightness: brightness,
       primary: colors.accent,
-      onPrimary: onAccent,
+      onPrimary: colors.onAccent,
       secondary: colors.accent,
-      onSecondary: onAccent,
+      onSecondary: colors.onAccent,
       error: colors.danger,
-      onError: onAccent,
+      onError: colors.onAccent,
       surface: colors.page,
       onSurface: colors.ink,
     );
 
-    final title = GoogleFonts.inter(
-      fontSize: 16,
-      fontWeight: FontWeight.w500,
-      height: 1.25,
-      letterSpacing: -0.3,
-      color: colors.ink,
-    );
-    final body = GoogleFonts.inter(
-      fontSize: 15,
-      fontWeight: FontWeight.w400,
-      height: 1.45,
-      letterSpacing: -0.1,
-      color: colors.ink,
-    );
-    final meta = GoogleFonts.inter(
-      fontSize: 12,
-      fontWeight: FontWeight.w400,
-      height: 1.35,
-      letterSpacing: 0.15,
-      color: colors.meta,
+    final title = PaperType.screenTitle(colors.ink);
+    final body = PaperType.body(colors.ink);
+    final meta = PaperType.meta(colors.meta);
+    final button = PaperType.cardTitle(colors.ink);
+
+    final outline = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
+      borderSide: BorderSide(color: colors.line),
     );
 
     final base = ThemeData(
       useMaterial3: true,
       brightness: brightness,
+      fontFamily: PaperTokens.fontFamily,
       colorScheme: scheme,
       scaffoldBackgroundColor: colors.canvas,
       extensions: [colors],
     );
 
     return base.copyWith(
-      textTheme: GoogleFonts.interTextTheme(base.textTheme).copyWith(
+      textTheme: base.textTheme.copyWith(
+        displaySmall: PaperType.display(colors.ink),
         titleMedium: title,
+        titleSmall: PaperType.cardTitle(colors.ink),
+        bodyLarge: PaperType.bodyRelaxed(colors.ink),
         bodyMedium: body,
         bodySmall: meta,
-        labelLarge: body.copyWith(fontWeight: FontWeight.w500),
+        labelLarge: button,
+        labelMedium: PaperType.label(colors.meta),
+        labelSmall: PaperType.tool(colors.meta),
       ),
       iconTheme: IconThemeData(color: colors.meta, size: 20),
       dividerColor: colors.line,
@@ -74,58 +65,83 @@ class AppTheme {
           TargetPlatform.windows: FadeUpwardsPageTransitionsBuilder(),
         },
       ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: colors.page,
+        isDense: true,
+        hintStyle: PaperType.body(colors.meta),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: PaperTokens.space14,
+          vertical: PaperTokens.space14,
+        ),
+        border: outline,
+        enabledBorder: outline,
+        disabledBorder: outline,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
+          borderSide: BorderSide(color: colors.ink, width: 1.5),
+        ),
+      ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
           backgroundColor: colors.accent,
-          foregroundColor: onAccent,
+          foregroundColor: colors.onAccent,
           disabledBackgroundColor: colors.line,
           disabledForegroundColor: colors.meta,
-          textStyle: body.copyWith(
-            fontWeight: FontWeight.w500,
-            letterSpacing: -0.1,
+          textStyle: PaperType.cardTitle(colors.onAccent),
+          minimumSize: const Size(PaperTokens.minTap, PaperTokens.minTap),
+          padding: const EdgeInsets.symmetric(horizontal: PaperTokens.space16),
+          elevation: PaperTokens.elevation,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
           ),
-          minimumSize: const Size(64, 42),
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: colors.ink,
-          textStyle: body.copyWith(fontWeight: FontWeight.w500),
-          minimumSize: const Size(44, 40),
+          textStyle: PaperType.labelStrong(colors.ink),
+          minimumSize: const Size(PaperTokens.minTap, PaperTokens.minTap),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: const EdgeInsets.symmetric(horizontal: PaperTokens.space8),
         ),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: colors.meta,
-          minimumSize: const Size(40, 40),
+          minimumSize: const Size(PaperTokens.minTap, PaperTokens.minTap),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: colors.ink,
         contentTextStyle: body.copyWith(color: colors.canvas),
         behavior: SnackBarBehavior.floating,
-        elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        elevation: PaperTokens.elevation,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
+        ),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: colors.page,
-        elevation: 0,
+        elevation: PaperTokens.elevation,
         surfaceTintColor: colors.page,
         textStyle: body,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(PaperTokens.radiusCluster),
           side: BorderSide(color: colors.line),
         ),
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: colors.page,
         surfaceTintColor: colors.page,
+        elevation: PaperTokens.elevation,
         titleTextStyle: title,
         contentTextStyle: body,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(PaperTokens.radiusCard),
+        ),
       ),
     );
   }

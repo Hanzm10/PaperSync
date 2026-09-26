@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/app_controller.dart';
+import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
+import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/page_row.dart';
 import 'device_screen.dart';
@@ -29,17 +31,15 @@ class NotebookPagesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppTopBar(
-        leading: IconButton(
-          tooltip: 'Back',
+        leading: BarAction(
+          label: 'Back',
           onPressed: () => Navigator.of(context).pop(),
-          icon: const Icon(Icons.arrow_back),
         ),
         title: TopTitle(notebook.name),
         link: model.link,
         onStatusTap: () => _openDevice(context),
-        overflow: PopupMenuButton<String>(
+        overflow: BarMenu(
           tooltip: 'Notebook actions',
-          icon: const Icon(Icons.more_horiz),
           onSelected: (value) async {
             if (value != 'rename') return;
             final name = await askName(
@@ -57,12 +57,18 @@ class NotebookPagesScreen extends ConsumerWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(
+          PaperTokens.space24,
+          PaperTokens.space12,
+          PaperTokens.space24,
+          PaperTokens.space32,
+        ),
         children: [
           Align(
             alignment: Alignment.centerLeft,
-            child: FilledButton(
+            child: PrimaryButton(
               key: const Key('live-page-button'),
+              label: connected ? 'Live page' : 'Connect pen',
               onPressed: () {
                 if (connected) {
                   Navigator.of(context).push(
@@ -74,11 +80,10 @@ class NotebookPagesScreen extends ConsumerWidget {
                   _openDevice(context);
                 }
               },
-              child: Text(connected ? 'Live page' : 'Connect pen'),
             ),
           ),
-          const SizedBox(height: 16),
-          for (final page in pages)
+          const SizedBox(height: PaperTokens.space16),
+          for (final page in pages) ...[
             PageRow(
               page: page,
               onTap: () {
@@ -92,6 +97,8 @@ class NotebookPagesScreen extends ConsumerWidget {
                 );
               },
             ),
+            const SizedBox(height: PaperTokens.space16),
+          ],
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(

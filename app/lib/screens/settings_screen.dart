@@ -9,7 +9,6 @@ import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
 import 'account_sync_screen.dart';
-import 'comic_strip_screen.dart';
 import 'device_screen.dart';
 import 'sync_issue_screen.dart';
 
@@ -24,12 +23,9 @@ class SettingsScreen extends ConsumerWidget {
     final prefsController = ref.read(uiPreferencesProvider.notifier);
     final link = ref.watch(appControllerProvider).link;
     final status = ref.watch(syncStatusProvider);
-    final name = prefs.displayName.trim().isEmpty
-        ? 'Not signed in'
-        : prefs.displayName.trim();
-    final email = prefs.email.trim().isEmpty
-        ? 'Email not on this phone'
-        : prefs.email.trim();
+    final signedIn = ref.watch(paperSyncAuthProvider).current != null;
+    final email = prefs.email.trim();
+    final heading = signedIn && email.isNotEmpty ? email : 'Not signed in';
     final battery = link.batteryPercent;
     final penLine = link.penName == null
         ? 'No pen paired'
@@ -54,8 +50,7 @@ class SettingsScreen extends ConsumerWidget {
             children: [
               const SectionLabel('ACCOUNT'),
               SettingsTile(
-                title: name,
-                subtitle: email,
+                title: heading,
                 trailing: Text(
                   'View',
                   style: Theme.of(context).textTheme.labelMedium,
@@ -117,11 +112,12 @@ class SettingsScreen extends ConsumerWidget {
               Divider(height: 1, color: colors.line),
               SettingsTile(
                 title: 'Appearance',
-                trailing: Text(
-                  prefs.appearanceLabel,
-                  style: Theme.of(context).textTheme.labelMedium,
+                trailing: AppearanceToggle(
+                  isDark: prefs.isDarkAppearance,
+                  onChanged: (dark) => prefsController.setAppearance(
+                    dark ? ThemeMode.dark : ThemeMode.light,
+                  ),
                 ),
-                onPressed: prefsController.cycleAppearance,
               ),
               SettingsTile(
                 title: 'Export defaults',
@@ -130,22 +126,6 @@ class SettingsScreen extends ConsumerWidget {
                   style: Theme.of(context).textTheme.labelMedium,
                 ),
                 onPressed: prefsController.cycleExport,
-              ),
-              const SizedBox(height: PaperTokens.space16),
-              SettingsTile(
-                title: 'Comic strip',
-                subtitle: 'Page 1 in the design file',
-                trailing: Text(
-                  'Open',
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => const ComicStripScreen(),
-                    ),
-                  );
-                },
               ),
             ],
           ),

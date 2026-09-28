@@ -29,6 +29,8 @@ Phone boxes are encrypted. The web demo is not. The README says so.
 
 ## Sign-in
 
-Sign-in is an emailed 6-digit code (Supabase email OTP). A magic link would
-need a deep link into the app; the code does not. The anon key is the only
-Supabase credential that ships with the app. The service role key does not.
+Create account and sign-in are email plus password. The account is usable as
+soon as Supabase returns a session, so Confirm email stays off in the project.
+A forgotten password cannot be reset from the app. The pen screen opens Sign in
+when notebooks need a backup. The anon key is the only Supabase credential that
+ships with the app. The service role key does not.

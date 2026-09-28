@@ -16,20 +16,20 @@ There is no dark-mode frame, and no separate Search, loading, empty, or error fr
 | Frame | Node | App surface | Status |
 | --- | --- | --- | --- |
 | Welcome | `2003:172` | `WelcomeScreen`, first screen | Built. Continue without account opens the library. |
-| Sign in | `2003:174` | `SignInScreen` | Built. UI-only for the password. Phase 4 sign-in is an email code; the password is not sent. |
-| Create account | `2003:176` | `CreateAccountScreen` | Built. UI-only for the password. The name and email stay on this phone. A cloud account is not created unless backup is configured, and then the email-code sheet runs. |
+| Sign in | `2003:174` | `SignInScreen` | Built. Email plus password. |
+| Create account | `2003:176` | `CreateAccountScreen` | Built. Email plus password. A session opens the library. Without backup, only the email stays on this phone. |
 | Reset password | `2003:178` | `ResetPasswordScreen` | Built. UI-only. The artboard's "Check your inbox" note is shown. The button does not send a link. |
 | Library | `2003:180` | `LibraryScreen` | Built. A Settings control was added so that frame is reachable. The file's row only has New notebook. |
 | Notebook | `2003:182` | `NotebookPagesScreen` | Built |
 | Live capture | `2003:184` | `LiveCaptureScreen` | Built. Ink keeps the 170×107 mm canvas. |
 | Page editor | `2003:186` | `PageEditorScreen` | Built |
 | Pen | `2003:188` | `DeviceScreen` when a pen is bonded | Built |
-| Settings | `2003:190` | `SettingsScreen` | Built. Handwriting recognition, export default, and the comic-strip row are UI-only. Appearance changes the theme. |
+| Settings | `2003:190` | `SettingsScreen` | Built. Handwriting recognition and export default are UI-only. Appearance changes the theme. |
 | Account and sync | `2003:192` | `AccountSyncScreen` | Built. UI-only for storage size ("On this phone", not "18 MB"), last-sync time ("not recorded", not "just now"), and the mobile-data switch. The name is whatever was typed on Create account. |
 | Pen setup | `2003:194` | `DeviceScreen` while pairing | Built. Bluetooth permission stays in front of Connect. |
 | Sync recovery | `2003:196` | `SyncIssueScreen` | Built. The card lists real local pages. It does not invent "Pages 4, 5, and 6". |
-| Comic Strip | `5:360` | `ComicStripScreen` | Built. UI-only. The images API returned no render, so the screen shows the frame's text. Opened from Settings. |
-| Phase 4 sign-in sheet | none | `showSignInSheet` on the pen screen | Built. Email code, not a Figma frame. |
+| Comic Strip | `5:360` | `ComicStripScreen` | Screen remains in the project. Settings no longer opens it. |
+| Phase 4 sign-in sheet | none | unused | The pen screen opens `SignInScreen` instead. |
 | Search | none | `SearchScreen` | Built from tokens. Results match saved `recognizedText`. ML Kit handwriting search is not added. |
 | Empty library | none | `LibraryScreen` empty state | Built |
 | Storage error | none | quarantine banner on `LibraryScreen` | Built |
@@ -39,7 +39,7 @@ There is no dark-mode frame, and no separate Search, loading, empty, or error fr
 
 ## What the screens do not pretend
 
-- Password sign-in, account creation, and reset links are not a backend. Copy on those screens says so when you submit.
+- Password reset artboard remains UI-only. A forgotten password cannot be reset from the app.
 - Handwriting recognition does not start ML Kit. Search keeps using text already stored on a page.
 - Sync over mobile data does not change `SyncService`.
 - Storage used is not a byte count. Nothing in Phases 1–4 records one.

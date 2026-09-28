@@ -87,7 +87,9 @@ class PaperSyncApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final mode = ref.watch(uiPreferencesProvider).themeMode;
+    final prefs = ref.watch(uiPreferencesProvider);
+    // Light/dark only — never follow the OS (ThemeMode.system).
+    final mode = prefs.isDarkAppearance ? ThemeMode.dark : ThemeMode.light;
     return MaterialApp(
       title: 'PaperSync',
       debugShowCheckedModeBanner: false,

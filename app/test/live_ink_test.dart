@@ -104,7 +104,7 @@ void main() {
       stored.any((point) => (point.xMm - sample.xMm).abs() < 0.02),
       isTrue,
     );
-    expect(find.byKey(const Key('debug-ink-overlay')), findsOneWidget);
+    expect(find.byKey(const Key('debug-ink-overlay')), findsNothing);
   });
 
   testWidgets('the page-turn scenario creates page 2', (tester) async {

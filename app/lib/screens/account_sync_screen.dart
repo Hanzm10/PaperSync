@@ -23,12 +23,10 @@ class AccountSyncScreen extends ConsumerWidget {
     final prefs = ref.watch(uiPreferencesProvider);
     final controller = ref.read(uiPreferencesProvider.notifier);
     final status = ref.watch(syncStatusProvider);
-    final name = prefs.displayName.trim().isEmpty
-        ? 'Not signed in'
-        : prefs.displayName.trim();
-    final email = prefs.email.trim().isEmpty
-        ? 'Email not on this phone'
-        : prefs.email.trim();
+    final signedIn = ref.watch(paperSyncAuthProvider).current != null;
+    final email = prefs.email.trim();
+    final heading = signedIn && email.isNotEmpty ? email : 'Not signed in';
+    final initial = signedIn && email.isNotEmpty ? email[0].toUpperCase() : '?';
     final lastSync = lastSyncLine(status);
 
     return Scaffold(
@@ -48,12 +46,10 @@ class AccountSyncScreen extends ConsumerWidget {
               color: colors.line,
               shape: BoxShape.circle,
             ),
-            child: Text(prefs.initial, style: PaperType.avatar(colors.ink)),
+            child: Text(initial, style: PaperType.avatar(colors.ink)),
           ),
           const SizedBox(height: PaperTokens.space8),
-          Text(name, style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: PaperTokens.space8),
-          Text(email, style: PaperType.caption(colors.meta)),
+          Text(heading, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: PaperTokens.space8),
           Expanded(
             child: ListView(

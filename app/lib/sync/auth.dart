@@ -5,15 +5,28 @@ class SignedInAccount {
   final String id;
 }
 
-/// Email one-time-code sign-in. The session itself lives in secure storage.
+/// A sign-in or registration attempt the server refused.
+class AuthRejected implements Exception {
+  const AuthRejected(this.message);
+
+  final String message;
+}
+
+/// Account sign-in. The session itself lives in secure storage.
+///
+/// Create account and sign-in are email plus password. The account is usable
+/// when [register] or [signInWithPassword] returns a session.
 abstract class PaperSyncAuth {
   SignedInAccount? get current;
 
   Stream<SignedInAccount?> watchAccount();
 
-  Future<void> sendEmailCode(String email);
+  Future<void> register({required String email, required String password});
 
-  Future<void> verifyEmailCode({required String email, required String code});
+  Future<void> signInWithPassword({
+    required String email,
+    required String password,
+  });
 
   /// One refresh. False means the session is gone and the user must sign in.
   Future<bool> refreshSession();
@@ -32,13 +45,17 @@ class DisabledAuth implements PaperSyncAuth {
       const Stream<SignedInAccount?>.empty();
 
   @override
-  Future<void> sendEmailCode(String email) async {}
+  Future<void> register({required String email, required String password}) {
+    throw const AuthRejected("Backup isn't configured.");
+  }
 
   @override
-  Future<void> verifyEmailCode({
+  Future<void> signInWithPassword({
     required String email,
-    required String code,
-  }) async {}
+    required String password,
+  }) {
+    throw const AuthRejected("Backup isn't configured.");
+  }
 
   @override
   Future<bool> refreshSession() async => false;

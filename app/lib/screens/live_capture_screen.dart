@@ -1,19 +1,14 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ink_models.dart';
 import '../state/app_controller.dart';
-import '../state/debug_ink_stats.dart';
-import '../state/transport_choice.dart';
 import '../theme/tokens.dart';
 import '../widgets/chrome.dart';
-import '../widgets/debug_ink_overlay.dart';
 import '../widgets/ink_page.dart';
-import '../widgets/status_indicators.dart';
 
 class LiveCaptureScreen extends ConsumerStatefulWidget {
   const LiveCaptureScreen({super.key, required this.notebookId});
@@ -106,15 +101,6 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
               ),
             ),
             const SizedBox(height: PaperTokens.space12),
-            StatusLine(link: model.link),
-            if (debugOverlayEnabled(
-              debugMode: kDebugMode,
-              releaseMode: kReleaseMode,
-            ))
-              ValueListenableBuilder<DebugInkStats>(
-                valueListenable: _controller!.debugStats,
-                builder: (context, stats, _) => DebugInkOverlay(stats: stats),
-              ),
             if (page.markers.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.fromLTRB(

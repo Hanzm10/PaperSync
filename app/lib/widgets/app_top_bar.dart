@@ -1,17 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../models/pen_link.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
-import 'status_indicators.dart';
 
 class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   const AppTopBar({
     super.key,
     this.leading,
     required this.title,
-    this.link,
-    this.onStatusTap,
     this.overflow,
     this.expandTitle = false,
     this.height = PaperTokens.barHeight,
@@ -19,8 +15,6 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
 
   final Widget? leading;
   final Widget title;
-  final PenLink? link;
-  final VoidCallback? onStatusTap;
   final Widget? overflow;
   final bool expandTitle;
   final double height;
@@ -31,15 +25,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
   @override
   Widget build(BuildContext context) {
     final colors = context.colors;
-    final trailing = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ?overflow,
-        if (overflow != null && link != null)
-          const SizedBox(width: PaperTokens.space8),
-        if (link != null) StatusPill(link: link!, onTap: onStatusTap),
-      ],
-    );
+    final trailing = Row(mainAxisSize: MainAxisSize.min, children: [?overflow]);
 
     return Material(
       color: colors.canvas,

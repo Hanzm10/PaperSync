@@ -17,18 +17,11 @@ class PageRow extends StatelessWidget {
     final colors = context.colors;
     return InkWell(
       onTap: onTap,
+      borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(
-                maxWidth: PaperTokens.pagePreviewWidth,
-              ),
-              child: InkPage(strokes: page.strokes),
-            ),
-          ),
+          InkPage(strokes: page.strokes),
           const SizedBox(height: PaperTokens.space8),
           Text(
             'Page ${page.pageIndex} · ${formatMonthDay(page.createdAt)}',

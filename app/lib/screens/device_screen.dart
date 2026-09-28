@@ -13,7 +13,7 @@ import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/paper_svg.dart';
-import '../widgets/sign_in_sheet.dart';
+import 'sign_in_screen.dart';
 
 class DeviceScreen extends ConsumerStatefulWidget {
   const DeviceScreen({super.key});
@@ -44,7 +44,6 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
                 onPressed: () => Navigator.of(context).pop(),
               ),
         title: TopTitle(link.bonded ? 'Pen' : 'Pair your pen'),
-        link: link.bonded ? link : null,
       ),
       body: link.bonded
           ? _Bonded(
@@ -90,15 +89,9 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
       unawaited(ref.read(paperSyncAuthProvider).signOut());
       return;
     }
-    final auth = ref.read(paperSyncAuthProvider);
     unawaited(
-      showSignInSheet(
-        context,
-        sendCode: auth.sendEmailCode,
-        verifyCode: (email, code) {
-          return auth.verifyEmailCode(email: email, code: code);
-        },
-      ),
+      Navigator.of(context)
+          .push(MaterialPageRoute<void>(builder: (_) => const SignInScreen())),
     );
   }
 }

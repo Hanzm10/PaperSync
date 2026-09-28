@@ -26,22 +26,41 @@ class SupabasePaperSyncAuth implements PaperSyncAuth {
   }
 
   @override
-  Future<void> sendEmailCode(String email) async {
-    final address = email.trim();
-    if (!isEmailAddress(address)) {
-      throw const FormatException('email');
+  Future<void> register({
+    required String email,
+    required String password,
+  }) async {
+    final AuthResponse response;
+    try {
+      response = await _client.auth
+          .signUp(email: email.trim(), password: password)
+          .timeout(_timeout);
+    } on AuthException catch (error) {
+      throw AuthRejected(_authMessage(error));
     }
-    await _client.auth.signInWithOtp(email: address).timeout(_timeout);
+    final identities = response.user?.identities;
+    if (response.session == null && identities != null && identities.isEmpty) {
+      throw const AuthRejected('That email is already registered.');
+    }
+    if (response.session == null) {
+      throw const AuthRejected(
+        'Email confirmation is still on. Turn it off in the Supabase project, then try again.',
+      );
+    }
   }
 
   @override
-  Future<void> verifyEmailCode({
+  Future<void> signInWithPassword({
     required String email,
-    required String code,
+    required String password,
   }) async {
-    await _client.auth
-        .verifyOTP(email: email.trim(), token: code.trim(), type: OtpType.email)
-        .timeout(_timeout);
+    try {
+      await _client.auth
+          .signInWithPassword(email: email.trim(), password: password)
+          .timeout(_timeout);
+    } on AuthException {
+      throw const AuthRejected("Those details didn't match.");
+    }
   }
 
   @override
@@ -60,4 +79,16 @@ class SupabasePaperSyncAuth implements PaperSyncAuth {
   Future<void> signOut() {
     return _client.auth.signOut().timeout(_timeout);
   }
+}
+
+String _authMessage(AuthException error) {
+  final text = error.message.toLowerCase();
+  if (text.contains('already registered') ||
+      text.contains('already been registered')) {
+    return 'That email is already registered.';
+  }
+  if (text.contains('invalid login') || text.contains('invalid credentials')) {
+    return "Those details didn't match.";
+  }
+  return "That didn't work. Try again.";
 }

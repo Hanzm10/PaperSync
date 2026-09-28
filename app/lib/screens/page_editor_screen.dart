@@ -11,7 +11,6 @@ import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/editor_bar.dart';
 import '../widgets/ink_page.dart';
-import 'device_screen.dart';
 
 class PageEditorScreen extends ConsumerStatefulWidget {
   const PageEditorScreen({
@@ -47,12 +46,6 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
       appBar: AppTopBar(
         leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: TopTitle('Page ${page.pageIndex}'),
-        link: model.link,
-        onStatusTap: () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute<void>(builder: (_) => const DeviceScreen()));
-        },
         overflow: BarMenu(
           tooltip: 'Page actions',
           onSelected: (value) => _onMenu(context, controller, page, value),

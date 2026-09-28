@@ -5,17 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/cloud.dart';
 import '../state/ui_preferences.dart';
+import '../sync/auth.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
-import '../widgets/sign_in_sheet.dart';
 
 final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
-/// Name, email, and password form from frame `2003:176`.
-///
-/// There is no password account API. A name typed here stays on this phone.
+/// Email and password. A session from sign-up opens the library.
 class CreateAccountScreen extends ConsumerStatefulWidget {
   const CreateAccountScreen({super.key});
 
@@ -25,18 +23,15 @@ class CreateAccountScreen extends ConsumerStatefulWidget {
 }
 
 class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
-  final TextEditingController _name = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
   var _obscure = true;
-  var _nameError = '';
   var _emailError = '';
   var _passwordError = '';
   var _message = '';
 
   @override
   void dispose() {
-    _name.dispose();
     _email.dispose();
     _password.dispose();
     super.dispose();
@@ -63,14 +58,6 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
               ),
               children: [
                 PaperField(
-                  label: 'Name',
-                  hint: 'Your name',
-                  controller: _name,
-                  error: _nameError.isEmpty ? null : _nameError,
-                  onChanged: (_) => setState(() => _nameError = ''),
-                ),
-                const SizedBox(height: PaperTokens.space16),
-                PaperField(
                   label: 'Email',
                   hint: 'name@example.com',
                   controller: _email,
@@ -93,7 +80,7 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                 ),
                 const SizedBox(height: PaperTokens.space8),
                 Text(
-                  'At least 8 characters',
+                  'At least 8 characters.',
                   style: PaperType.caption(colors.meta),
                 ),
                 const SizedBox(height: PaperTokens.space16),
@@ -132,9 +119,7 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   }
 
   Future<void> _submit() async {
-    final name = _name.text.trim();
     final email = _email.text.trim();
-    final nameError = name.isEmpty ? 'Enter your name.' : '';
     final emailError = _emailPattern.hasMatch(email)
         ? ''
         : 'Enter an email address.';
@@ -142,39 +127,36 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
         ? 'Use at least 8 characters.'
         : '';
     setState(() {
-      _nameError = nameError;
       _emailError = emailError;
       _passwordError = passwordError;
       _message = '';
     });
-    if (nameError.isNotEmpty ||
-        emailError.isNotEmpty ||
-        passwordError.isNotEmpty) {
+    if (emailError.isNotEmpty || passwordError.isNotEmpty) {
       return;
     }
     ref
         .read(uiPreferencesProvider.notifier)
-        .rememberProfile(name: name, email: email);
+        .rememberProfile(name: '', email: email);
     if (!ref.read(backupReadyProvider)) {
       setState(() {
         _message =
-            'Your name stays on this phone. Backup isn\'t configured, '
-            'so this does not create a cloud account. The password is not saved.';
+            'Your email stays on this phone. '
+            'Backup isn\'t configured, so this does not create a cloud account.';
       });
       return;
     }
     final auth = ref.read(paperSyncAuthProvider);
-    setState(() {
-      _message = "We'll email a code to finish. The password is not saved.";
-    });
-    await showSignInSheet(
-      context,
-      initialEmail: email,
-      sendCode: auth.sendEmailCode,
-      verifyCode: (address, code) {
-        return auth.verifyEmailCode(email: address, code: code);
-      },
-    );
+    try {
+      await auth.register(email: email, password: _password.text);
+    } on AuthRejected catch (error) {
+      if (!mounted) return;
+      setState(() => _message = error.message);
+      return;
+    } on Object {
+      if (!mounted) return;
+      setState(() => _message = "That didn't work. Try again.");
+      return;
+    }
     if (!mounted) return;
     if (ref.read(paperSyncAuthProvider).current != null) {
       ref.read(uiPreferencesProvider.notifier).enterLibrary();

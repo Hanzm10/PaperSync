@@ -73,7 +73,20 @@ void main() {
     expect(find.byKey(const Key('stroke-tools')), findsOneWidget);
     expect(find.byKey(const Key('ink-dots')), findsOneWidget);
     expect(find.byTooltip('Undo'), findsOneWidget);
+    expect(find.byTooltip('Redo'), findsOneWidget);
+    expect(find.byTooltip('Select'), findsOneWidget);
+    expect(find.byTooltip('Move'), findsOneWidget);
     expect(find.byTooltip('Erase'), findsOneWidget);
+    expect(find.byTooltip('More colors'), findsOneWidget);
+    expect(find.text('Undo'), findsNothing);
+    expect(find.text('Erase'), findsNothing);
+
+    await tester.tap(find.byTooltip('More colors'));
+    await tester.pumpAndSettle();
+    expect(find.text('Ink color'), findsOneWidget);
+    expect(find.text('Use color'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byTooltip('Page actions'));
     await tester.pumpAndSettle();
@@ -85,8 +98,7 @@ void main() {
 
     await tester.pageBack();
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(find.text('New page'), 400);
-    expect(find.text('New page'), findsOneWidget);
+    expect(find.byTooltip('New page'), findsOneWidget);
     await tester.pageBack();
     await tester.pumpAndSettle();
 
@@ -154,12 +166,13 @@ void main() {
     await tester.tap(find.text('Disconnect'));
     await tester.pump();
     expect(find.text('Connect'), findsOneWidget);
-    expect(find.text('Not connected'), findsWidgets);
+    expect(find.text('Disconnect'), findsNothing);
 
     await tester.tap(find.text('Connect'));
     await tester.pump();
-    expect(find.textContaining('Reconnecting'), findsWidgets);
+    expect(find.text('Disconnect'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1300));
-    expect(find.text('Saving'), findsWidgets);
+    expect(find.text('Disconnect'), findsOneWidget);
+    expect(find.textContaining('76% battery'), findsOneWidget);
   });
 }

@@ -264,12 +264,15 @@ class _Auth implements PaperSyncAuth {
   Stream<SignedInAccount?> watchAccount() => const Stream.empty();
 
   @override
-  Future<void> sendEmailCode(String email) async {}
+  Future<void> register({
+    required String email,
+    required String password,
+  }) async {}
 
   @override
-  Future<void> verifyEmailCode({
+  Future<void> signInWithPassword({
     required String email,
-    required String code,
+    required String password,
   }) async {}
 
   @override

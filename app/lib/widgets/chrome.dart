@@ -70,104 +70,21 @@ class _BackArrowPainter extends CustomPainter {
       oldDelegate.color != color;
 }
 
-/// Toggles password obscuring. Tooltip and accessible name stay "Show"/"Hide".
-class PasswordVisibilityButton extends StatelessWidget {
-  const PasswordVisibilityButton({
-    super.key,
-    required this.obscured,
-    required this.onPressed,
-  });
-
-  /// When true the field hides the password and the glyph is a closed eye.
-  final bool obscured;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = context.colors;
-    final label = obscured ? 'Show' : 'Hide';
-    return IconButton(
-      onPressed: onPressed,
-      tooltip: label,
-      style: IconButton.styleFrom(
-        foregroundColor: colors.meta,
-        minimumSize: const Size(PaperTokens.minTap, PaperTokens.minTap),
-        padding: EdgeInsets.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-      icon: _EyeIcon(open: !obscured),
-    );
-  }
-}
-
-class _EyeIcon extends StatelessWidget {
-  const _EyeIcon({required this.open});
-
-  final bool open;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = IconTheme.of(context).color ?? context.colors.meta;
-    return CustomPaint(
-      size: const Size(20, 20),
-      painter: _EyePainter(color: color, open: open),
-    );
-  }
-}
-
-class _EyePainter extends CustomPainter {
-  const _EyePainter({required this.color, required this.open});
-
-  final Color color;
-  final bool open;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.75
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final lid = Path()
-      ..moveTo(size.width * 0.12, cy)
-      ..cubicTo(
-        size.width * 0.28,
-        size.height * 0.28,
-        size.width * 0.72,
-        size.height * 0.28,
-        size.width * 0.88,
-        cy,
-      )
-      ..cubicTo(
-        size.width * 0.72,
-        size.height * 0.72,
-        size.width * 0.28,
-        size.height * 0.72,
-        size.width * 0.12,
-        cy,
-      );
-    canvas.drawPath(lid, paint);
-    if (open) {
-      canvas.drawCircle(Offset(cx, cy), size.width * 0.14, paint);
-    } else {
-      canvas.drawLine(
-        Offset(size.width * 0.22, size.height * 0.78),
-        Offset(size.width * 0.78, size.height * 0.22),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_EyePainter oldDelegate) =>
-      oldDelegate.color != color || oldDelegate.open != open;
-}
-
 /// Stroke glyphs used by bar and nav chrome. Drawn to match [BarBackButton].
-enum PaperGlyph { search, plus, close, more, library, settings }
+enum PaperGlyph {
+  search,
+  plus,
+  close,
+  more,
+  library,
+  settings,
+  undo,
+  redo,
+  select,
+  move,
+  erase,
+  palette,
+}
 
 /// Icon control in a bar. [label] is the tooltip and accessible name.
 class BarAction extends StatelessWidget {
@@ -371,6 +288,18 @@ class _PaperGlyphPainter extends CustomPainter {
         _paintLibrary(canvas, size, paint);
       case PaperGlyph.settings:
         _paintSettings(canvas, size, paint);
+      case PaperGlyph.undo:
+        _paintUndo(canvas, size, paint);
+      case PaperGlyph.redo:
+        _paintRedo(canvas, size, paint);
+      case PaperGlyph.select:
+        _paintSelect(canvas, size, paint);
+      case PaperGlyph.move:
+        _paintMove(canvas, size, paint);
+      case PaperGlyph.erase:
+        _paintErase(canvas, size, paint);
+      case PaperGlyph.palette:
+        _paintPalette(canvas, size, paint);
     }
   }
 
@@ -478,6 +407,106 @@ class _PaperGlyphPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
+  void _paintUndo(Canvas canvas, Size size, Paint paint) {
+    canvas.save();
+    canvas.translate(size.width, 0);
+    canvas.scale(-1, 1);
+    _paintRedo(canvas, size, paint);
+    canvas.restore();
+  }
+
+  /// U-turn open to the right; upper arm ends in a right-pointing head.
+  void _paintRedo(Canvas canvas, Size size, Paint paint) {
+    final oval = Rect.fromLTWH(
+      size.width * 0.20,
+      size.height * 0.20,
+      size.width * 0.56,
+      size.height * 0.60,
+    );
+    // 5 o'clock → left → 12 o'clock; clockwise tangent at the tip points right.
+    const startAngle = math.pi * 0.55;
+    const sweepAngle = math.pi * 0.95;
+    canvas.drawArc(oval, startAngle, sweepAngle, false, paint);
+    final endAngle = startAngle + sweepAngle;
+    final tip = Offset(
+      oval.center.dx + oval.width / 2 * math.cos(endAngle),
+      oval.center.dy + oval.height / 2 * math.sin(endAngle),
+    );
+    final head = Path()
+      ..moveTo(tip.dx - size.width * 0.16, tip.dy - size.height * 0.02)
+      ..lineTo(tip.dx, tip.dy)
+      ..lineTo(tip.dx - size.width * 0.10, tip.dy + size.height * 0.16);
+    canvas.drawPath(head, paint);
+  }
+
+  void _paintSelect(Canvas canvas, Size size, Paint paint) {
+    final path = Path()
+      ..moveTo(size.width * 0.30, size.height * 0.18)
+      ..lineTo(size.width * 0.30, size.height * 0.72)
+      ..lineTo(size.width * 0.42, size.height * 0.58)
+      ..lineTo(size.width * 0.56, size.height * 0.82)
+      ..lineTo(size.width * 0.64, size.height * 0.76)
+      ..lineTo(size.width * 0.48, size.height * 0.54)
+      ..lineTo(size.width * 0.66, size.height * 0.54)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  void _paintMove(Canvas canvas, Size size, Paint paint) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final tip = size.width * 0.18;
+    final arm = size.width * 0.10;
+    canvas.drawLine(Offset(cx, tip), Offset(cx, size.height - tip), paint);
+    canvas.drawLine(Offset(tip, cy), Offset(size.width - tip, cy), paint);
+    canvas.drawLine(Offset(cx - arm, tip + arm), Offset(cx, tip), paint);
+    canvas.drawLine(Offset(cx + arm, tip + arm), Offset(cx, tip), paint);
+    canvas.drawLine(
+      Offset(cx - arm, size.height - tip - arm),
+      Offset(cx, size.height - tip),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(cx + arm, size.height - tip - arm),
+      Offset(cx, size.height - tip),
+      paint,
+    );
+    canvas.drawLine(Offset(tip + arm, cy - arm), Offset(tip, cy), paint);
+    canvas.drawLine(Offset(tip + arm, cy + arm), Offset(tip, cy), paint);
+    canvas.drawLine(
+      Offset(size.width - tip - arm, cy - arm),
+      Offset(size.width - tip, cy),
+      paint,
+    );
+    canvas.drawLine(
+      Offset(size.width - tip - arm, cy + arm),
+      Offset(size.width - tip, cy),
+      paint,
+    );
+  }
+
+  void _paintErase(Canvas canvas, Size size, Paint paint) {
+    final body = Path()
+      ..moveTo(size.width * 0.22, size.height * 0.58)
+      ..lineTo(size.width * 0.42, size.height * 0.22)
+      ..lineTo(size.width * 0.78, size.height * 0.38)
+      ..lineTo(size.width * 0.58, size.height * 0.74)
+      ..close();
+    canvas.drawPath(body, paint);
+    canvas.drawLine(
+      Offset(size.width * 0.34, size.height * 0.48),
+      Offset(size.width * 0.66, size.height * 0.62),
+      paint,
+    );
+  }
+
+  void _paintPalette(Canvas canvas, Size size, Paint paint) {
+    final r = size.width * 0.16;
+    canvas.drawCircle(Offset(size.width * 0.38, size.height * 0.40), r, paint);
+    canvas.drawCircle(Offset(size.width * 0.62, size.height * 0.40), r, paint);
+    canvas.drawCircle(Offset(size.width * 0.50, size.height * 0.62), r, paint);
+  }
+
   @override
   bool shouldRepaint(_PaperGlyphPainter oldDelegate) =>
       oldDelegate.glyph != glyph || oldDelegate.color != color;
@@ -542,6 +571,26 @@ class SecondaryButton extends StatelessWidget {
         ),
         child: Text(label),
       ),
+    );
+  }
+}
+
+/// Shows or hides a password. The accessible name stays "Show" or "Hide".
+class PasswordVisibilityButton extends StatelessWidget {
+  const PasswordVisibilityButton({
+    super.key,
+    required this.obscured,
+    required this.onPressed,
+  });
+
+  final bool obscured;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: onPressed,
+      child: Text(obscured ? 'Show' : 'Hide'),
     );
   }
 }
@@ -643,6 +692,94 @@ class SettingsTile extends StatelessWidget {
                 trailing!,
               ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Two-state Dark / Light control for Settings Appearance.
+class AppearanceToggle extends StatelessWidget {
+  const AppearanceToggle({
+    super.key,
+    required this.isDark,
+    required this.onChanged,
+  });
+
+  final bool isDark;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return Semantics(
+      label: 'Appearance',
+      value: isDark ? 'Dark' : 'Light',
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colors.canvas,
+          borderRadius: BorderRadius.circular(PaperTokens.radiusPill),
+          border: Border.all(color: colors.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _AppearanceSegment(
+              label: 'Dark',
+              selected: isDark,
+              onPressed: () => onChanged(true),
+            ),
+            _AppearanceSegment(
+              label: 'Light',
+              selected: !isDark,
+              onPressed: () => onChanged(false),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AppearanceSegment extends StatelessWidget {
+  const _AppearanceSegment({
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    final style = Theme.of(context).textTheme.labelMedium;
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? colors.page : Colors.transparent,
+        borderRadius: BorderRadius.circular(PaperTokens.radiusPill),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(PaperTokens.radiusPill),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: PaperTokens.space12,
+              vertical: PaperTokens.space6,
+            ),
+            child: Text(
+              label,
+              style: style?.copyWith(
+                color: selected ? colors.ink : colors.meta,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+              ),
+            ),
           ),
         ),
       ),

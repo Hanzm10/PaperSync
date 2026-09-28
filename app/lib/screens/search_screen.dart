@@ -8,7 +8,6 @@ import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
 import '../widgets/ink_page.dart';
-import 'device_screen.dart';
 import 'page_editor_screen.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {
@@ -63,12 +62,6 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
             onChanged: (_) => setState(() {}),
           ),
         ),
-        link: model.link,
-        onStatusTap: () {
-          Navigator.of(
-            context,
-          ).push(MaterialPageRoute<void>(builder: (_) => const DeviceScreen()));
-        },
       ),
       body: _body(context, indexed, results, query, colors),
     );

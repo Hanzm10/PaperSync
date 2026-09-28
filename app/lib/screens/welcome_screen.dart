@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
 import '../widgets/chrome.dart';
-import '../widgets/paper_svg.dart';
 import 'create_account_screen.dart';
 import 'sign_in_screen.dart';
 
-/// Launch frame `2003:172`. The file paints this one screen black.
+/// Launch frame `2003:172`. Light uses the app canvas; dark keeps the black
+/// welcome ground so the gray / white wordmarks stay readable.
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key, required this.onContinue});
 
@@ -15,8 +15,10 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = context.colors;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: PaperTokens.welcomeBackground,
+      backgroundColor: dark ? PaperTokens.welcomeBackground : colors.canvas,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(
@@ -27,18 +29,32 @@ class WelcomeScreen extends StatelessWidget {
           ),
           child: Column(
             children: [
-              const PaperSvg.inkPreview(adapt: false),
+              const _WelcomeLogo(),
               const SizedBox(height: PaperTokens.space16),
-              Text(
-                'PaperSync',
+              Text.rich(
+                TextSpan(
+                  style: TextStyle(
+                    fontFamily: PaperTokens.fontFamily,
+                    fontSize: PaperTokens.displaySize,
+                    height: PaperTokens.displayHeight,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0,
+                  ),
+                  children: [
+                    TextSpan(text: 'Paper', style: TextStyle(color: colors.ink)),
+                    const TextSpan(
+                      text: 'Sync',
+                      style: TextStyle(color: PaperTokens.logoBlue),
+                    ),
+                  ],
+                ),
                 textAlign: TextAlign.center,
-                style: PaperType.display(PaperTokens.lightPage),
               ),
               const SizedBox(height: PaperTokens.space8),
               Text(
                 'Your paper notebook, searchable\nand safely synced.',
                 textAlign: TextAlign.center,
-                style: PaperType.bodyRelaxed(PaperTokens.darkMeta),
+                style: PaperType.bodyRelaxed(colors.meta),
               ),
               const Spacer(),
               _WelcomePrimary(
@@ -66,12 +82,35 @@ class WelcomeScreen extends StatelessWidget {
                 onPressed: onContinue,
                 child: Text(
                   'Continue without account',
-                  style: PaperType.caption(PaperTokens.darkMeta),
+                  style: PaperType.caption(colors.meta),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// App-icon brand mark above the PaperSync wordmark; no pale card.
+class _WelcomeLogo extends StatelessWidget {
+  const _WelcomeLogo();
+
+  static const _size = PaperTokens.penGlyph;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    return ExcludeSemantics(
+      child: Image.asset(
+        dark
+            ? 'assets/images/logo-welcome-dark.png'
+            : 'assets/images/logo-welcome.png',
+        width: _size,
+        height: _size,
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
       ),
     );
   }

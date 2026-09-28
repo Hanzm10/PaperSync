@@ -33,12 +33,6 @@ class PenLink {
     LinkState.disconnected => LinkTone.disconnected,
   };
 
-  String get shortLabel => switch (state) {
-    LinkState.saving => 'Saving',
-    LinkState.reconnecting => 'Reconnecting',
-    LinkState.disconnected => 'Not connected',
-  };
-
   factory PenLink.paired() {
     final now = DateTime.now();
     return PenLink(

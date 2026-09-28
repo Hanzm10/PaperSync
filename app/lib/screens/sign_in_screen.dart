@@ -5,19 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/cloud.dart';
 import '../state/ui_preferences.dart';
+import '../sync/auth.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
-import '../widgets/sign_in_sheet.dart';
 import 'create_account_screen.dart';
-import 'reset_password_screen.dart';
 
 final RegExp _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
-/// Password form from frame `2003:174`.
-///
-/// Phase 4 signs in with an email code. The password is not sent anywhere.
+/// Everyday sign-in is email and password.
 class SignInScreen extends ConsumerStatefulWidget {
   const SignInScreen({super.key});
 
@@ -81,27 +78,14 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     onPressed: () => setState(() => _obscure = !_obscure),
                   ),
                 ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const ResetPasswordScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text('Forgot password?'),
-                  ),
-                ),
-                const SizedBox(height: PaperTokens.space8),
+                const SizedBox(height: PaperTokens.space16),
                 PrimaryButton(
                   label: 'Sign in',
                   expand: true,
-                  onPressed: () => unawaited(_submit()),
+                  onPressed: () => unawaited(_submitPassword()),
                 ),
                 if (_message.isNotEmpty) ...[
-                  const SizedBox(height: PaperTokens.space12),
+                  const SizedBox(height: PaperTokens.space8),
                   Text(
                     _message,
                     style: Theme.of(context).textTheme.bodySmall
@@ -132,7 +116,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     );
   }
 
-  Future<void> _submit() async {
+  Future<void> _submitPassword() async {
     final email = _email.text.trim();
     final emailError = _emailPattern.hasMatch(email)
         ? ''
@@ -146,24 +130,31 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     if (emailError.isNotEmpty || passwordError.isNotEmpty) return;
     if (!ref.read(backupReadyProvider)) {
       setState(() {
-        _message =
-            "Backup isn't configured, so this screen can't sign you in. "
-            'The password is not sent.';
+        _message = "Backup isn't configured, so this screen can't sign you in.";
       });
       return;
     }
     final auth = ref.read(paperSyncAuthProvider);
-    setState(() {
-      _message = "We'll email a code. The password is not sent.";
-    });
-    await showSignInSheet(
-      context,
-      initialEmail: email,
-      sendCode: auth.sendEmailCode,
-      verifyCode: (address, code) {
-        return auth.verifyEmailCode(email: address, code: code);
-      },
-    );
+    try {
+      await auth.signInWithPassword(email: email, password: _password.text);
+    } on AuthRejected catch (error) {
+      if (!mounted) return;
+      setState(() => _message = error.message);
+      return;
+    } on Object {
+      if (!mounted) return;
+      setState(() => _message = "Those details didn't match.");
+      return;
+    }
+    if (!mounted) return;
+    final prefs = ref.read(uiPreferencesProvider);
+    ref
+        .read(uiPreferencesProvider.notifier)
+        .rememberProfile(name: prefs.displayName, email: email);
+    _enterLibraryIfSignedIn();
+  }
+
+  void _enterLibraryIfSignedIn() {
     if (!mounted) return;
     if (ref.read(paperSyncAuthProvider).current != null) {
       ref.read(uiPreferencesProvider.notifier).enterLibrary();

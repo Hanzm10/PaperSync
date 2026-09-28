@@ -109,12 +109,19 @@ void main() {
     _Case('sign_in_form', const SignInScreen(), emptyModel()),
     _Case('create_account', const CreateAccountScreen(), emptyModel()),
     _Case('reset_password', const ResetPasswordScreen(), emptyModel()),
-    _Case('settings', const SettingsScreen(), libraryModel(), profile: true),
+    _Case(
+      'settings',
+      const SettingsScreen(),
+      libraryModel(),
+      profile: true,
+      signedIn: true,
+    ),
     _Case(
       'account_sync',
       const AccountSyncScreen(),
       libraryModel(),
       profile: true,
+      signedIn: true,
     ),
     _Case('comic_strip', const ComicStripScreen(), emptyModel()),
   ];
@@ -143,6 +150,7 @@ class _Case {
     this.query,
     this.signIn = false,
     this.profile = false,
+    this.signedIn = false,
   });
 
   final String name;
@@ -153,6 +161,7 @@ class _Case {
   final String? query;
   final bool signIn;
   final bool profile;
+  final bool signedIn;
 }
 
 Future<void> _show(WidgetTester tester, _Case item, ThemeMode mode) async {
@@ -179,6 +188,8 @@ Future<void> _show(WidgetTester tester, _Case item, ThemeMode mode) async {
           syncStatusProvider.overrideWith((ref) => const SyncFailed(Offline())),
         if (item.signIn)
           paperSyncAuthProvider.overrideWithValue(const _OpenAuth()),
+        if (item.signedIn)
+          paperSyncAuthProvider.overrideWithValue(const _SignedInAuth()),
         if (item.profile) uiPreferencesProvider.overrideWith(_PeterPrefs.new),
       ],
       child: MaterialApp(
@@ -190,6 +201,14 @@ Future<void> _show(WidgetTester tester, _Case item, ThemeMode mode) async {
       ),
     ),
   );
+  await tester.pump();
+  // Asset ImageProviders decode off FakeAsync; precache so PNG logos paint.
+  await tester.runAsync(() async {
+    for (final element in find.byType(Image).evaluate()) {
+      final image = element.widget as Image;
+      await precacheImage(image.image, element);
+    }
+  });
   await tester.pumpAndSettle();
   final query = item.query;
   if (query != null) {
@@ -222,16 +241,47 @@ class _OpenAuth implements PaperSyncAuth {
   Stream<SignedInAccount?> watchAccount() => const Stream.empty();
 
   @override
-  Future<void> sendEmailCode(String email) async {}
+  Future<void> register({
+    required String email,
+    required String password,
+  }) async {}
 
   @override
-  Future<void> verifyEmailCode({
+  Future<void> signInWithPassword({
     required String email,
-    required String code,
+    required String password,
   }) async {}
 
   @override
   Future<bool> refreshSession() async => false;
+
+  @override
+  Future<void> signOut() async {}
+}
+
+class _SignedInAuth implements PaperSyncAuth {
+  const _SignedInAuth();
+
+  @override
+  SignedInAccount? get current => const SignedInAccount(id: 'peter');
+
+  @override
+  Stream<SignedInAccount?> watchAccount() => const Stream.empty();
+
+  @override
+  Future<void> register({
+    required String email,
+    required String password,
+  }) async {}
+
+  @override
+  Future<void> signInWithPassword({
+    required String email,
+    required String password,
+  }) async {}
+
+  @override
+  Future<bool> refreshSession() async => true;
 
   @override
   Future<void> signOut() async {}

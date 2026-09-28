@@ -12,7 +12,7 @@ todos:
     content: 'Phase 3 Persistence: encrypted hive_ce repositories, per-record sync flag, checkpoints, migrations, corruption quarantine (03-persistence.md)'
     status: pending
   - id: phase-4
-    content: 'Phase 4 Cloud: locked-down Supabase schema, email OTP, idempotent sync, RLS tests (04-cloud.md)'
+    content: 'Phase 4 Cloud: locked-down Supabase schema, email/password auth, idempotent sync, RLS tests (04-cloud.md)'
     status: pending
   - id: phase-5
     content: 'Phase 5 Figma UI: read the design via REST API with FIGMA_TOKEN, generate theme tokens and assets, rebuild widgets and screens, golden tests (05-figma-ui.md)'
@@ -74,7 +74,7 @@ flowchart LR
   - Server-owned `updated_at`, and version decreases are refused.
   - Child rows must belong to the user's own parent rows.
   - The advisors report no findings.
-- Auth uses email OTP, with the session in secure storage. Tokens, emails, and codes are never logged. Debug tools exist only under `kDebugMode`.
+- Auth uses email and password. The session lives in secure storage. Tokens and emails are never logged. Debug tools exist only under `kDebugMode`.
 
 **Persistence**
 - Stable UUID v4 ids everywhere. The current `'$prefix-$seq'` ids repeat after a restart.
@@ -97,4 +97,4 @@ These are deliberate, and will be recorded in `docs/` in Phase 1:
 
 - A per-record `syncState` flag replaces the separate outbox, so a write can't be half-applied.
 - Stroke points are stored as packed `bytea` of 12 bytes per point instead of `jsonb [{x,y,p,t}]`. That is about 4x smaller, with a size check.
-- Email OTP replaces the magic link, so there are no deep links.
+- Sign-in is email and password, so there are no deep links.

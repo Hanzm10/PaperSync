@@ -9,12 +9,16 @@ final RegExp _email = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
 bool _isEmailAddress(String value) => _email.hasMatch(value.trim());
 
-/// Email code sign-in. A resend is allowed 60 seconds after the last send.
+/// Email code entry. A resend is allowed 60 seconds after the last send.
 Future<void> showSignInSheet(
   BuildContext context, {
   required Future<void> Function(String email) sendCode,
   required Future<void> Function(String email, String code) verifyCode,
   String initialEmail = '',
+  String title = 'Back up notebooks',
+  String subtitle =
+      'We email a 6-digit code. Notes stay on this phone either way.',
+  bool startOnCode = false,
 }) {
   final colors = Theme.of(context).extension<AppColors>()!;
   return showModalBottomSheet<void>(
@@ -31,6 +35,9 @@ Future<void> showSignInSheet(
         sendCode: sendCode,
         verifyCode: verifyCode,
         initialEmail: initialEmail,
+        title: title,
+        subtitle: subtitle,
+        startOnCode: startOnCode,
       );
     },
   );
@@ -40,12 +47,18 @@ class _SignInSheet extends StatefulWidget {
   const _SignInSheet({
     required this.sendCode,
     required this.verifyCode,
+    required this.title,
+    required this.subtitle,
     this.initialEmail = '',
+    this.startOnCode = false,
   });
 
   final Future<void> Function(String email) sendCode;
   final Future<void> Function(String email, String code) verifyCode;
+  final String title;
+  final String subtitle;
   final String initialEmail;
+  final bool startOnCode;
 
   @override
   State<_SignInSheet> createState() => _SignInSheetState();
@@ -61,6 +74,16 @@ class _SignInSheetState extends State<_SignInSheet> {
   var _codeSent = false;
   var _busy = false;
   var _message = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.startOnCode) {
+      _codeSent = true;
+      _secondsLeft = 60;
+      _armResendTimer();
+    }
+  }
 
   @override
   void dispose() {
@@ -86,12 +109,12 @@ class _SignInSheetState extends State<_SignInSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'Back up notebooks',
+            widget.title,
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: PaperTokens.space8),
           Text(
-            'We email a 6-digit code. Notes stay on this phone either way.',
+            widget.subtitle,
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: PaperTokens.space16),
@@ -163,23 +186,27 @@ class _SignInSheetState extends State<_SignInSheet> {
         _codeSent = true;
         _secondsLeft = 60;
       });
-      _resend?.cancel();
-      _resend = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (!mounted) {
-          timer.cancel();
-          return;
-        }
-        setState(() {
-          _secondsLeft -= 1;
-          if (_secondsLeft <= 0) timer.cancel();
-        });
-      });
+      _armResendTimer();
     } on Object {
       if (!mounted) return;
       setState(() => _message = "Couldn't send the code.");
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _armResendTimer() {
+    _resend?.cancel();
+    _resend = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _secondsLeft -= 1;
+        if (_secondsLeft <= 0) timer.cancel();
+      });
+    });
   }
 
   Future<void> _verify() async {

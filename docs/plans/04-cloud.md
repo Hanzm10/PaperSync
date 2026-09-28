@@ -1,6 +1,6 @@
 ---
 name: PaperSync Phase 4 - Cloud
-overview: 'Back up and sync notebooks through Supabase: a locked-down schema (forced RLS, check constraints, server-owned timestamps and versions), email OTP sign-in with the session in secure storage, and an idempotent, deterministic sync of pending records.'
+overview: 'Back up and sync notebooks through Supabase: a locked-down schema (forced RLS, check constraints, server-owned timestamps and versions), email/password auth with the session in secure storage, and an idempotent, deterministic sync of pending records.'
 todos:
   - id: p4-project
     content: 'Create or select the Supabase project, add SUPABASE_URL and SUPABASE_ANON_KEY as Cloud Agent secrets and app/env/dev.json (gitignored), commit env/example.json'
@@ -9,7 +9,7 @@ todos:
     content: 'supabase/migrations/0001_init.sql: tables, forced RLS for authenticated only, check constraints, server triggers for updated_at and monotonic version, indexes; security advisors clean'
     status: pending
   - id: p4-auth
-    content: 'Email OTP sign-in sheet from the Device screen, session in flutter_secure_storage, sign-out behavior, account-switch rules'
+    content: 'Email/password auth, session in flutter_secure_storage, sign-out behavior, account-switch rules'
     status: pending
   - id: p4-sync
     content: 'lib/sync/: SyncService pushes pending records in batches, pulls by server updated_at cursor, deterministic merge, backoff, tombstone purge, syncStatusProvider'
@@ -55,16 +55,17 @@ Goal: signed-in users get their notebooks backed up and synced across phones. Si
 
 ## 3. Auth
 
-- Email OTP uses `signInWithOtp(email)` followed by `verifyOTP(type: email, token)`. There is no magic link, so no deep links or redirect URLs to secure.
-  - Supabase's built-in OTP rate limits and expiry stay on.
-  - The sheet validates the email format and allows a resend after 60 s.
+- Everyday sign-in is `signInWithPassword(email, password)`. Registration is
+  `signUp`. The account is usable when that call returns a session, which
+  requires Confirm email to be off. A forgotten password cannot be reset from
+  the app.
 - The session is stored in `flutter_secure_storage` through a custom `LocalStorage` passed to `Supabase.initialize(authOptions: ...)`, not in plain shared preferences.
-- The sign-in sheet opens from the Device screen, built with the existing widgets.
+- The pen screen opens Sign in when notebooks need a backup.
 - Signing out stops sync and clears the session. Local notebooks stay on the phone.
 - Account rules:
   - On first sign-in, rows with `ownerId == null` are claimed by that user.
   - Rows owned by another account are never uploaded, and are hidden while signed in as someone else.
-- Logs never contain tokens, emails, or OTP codes.
+- Logs never contain tokens or emails.
 
 ## 4. Sync: `app/lib/sync/`
 

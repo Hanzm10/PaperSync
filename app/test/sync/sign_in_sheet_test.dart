@@ -8,17 +8,14 @@ import 'package:papersync/sync/auth.dart';
 import 'package:papersync/theme/app_theme.dart';
 
 void main() {
-  testWidgets('the sign-in sheet checks the email and waits 60s to resend', (
-    tester,
-  ) async {
-    final auth = _SheetAuth();
+  testWidgets('pen backup opens sign in', (tester) async {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           appControllerProvider.overrideWith(
             () => AppController(AppModel.empty()),
           ),
-          paperSyncAuthProvider.overrideWithValue(auth),
+          paperSyncAuthProvider.overrideWithValue(const _OpenAuth()),
         ],
         child: MaterialApp(theme: AppTheme.light(), home: const DeviceScreen()),
       ),
@@ -27,24 +24,15 @@ void main() {
 
     await tester.tap(find.text('Back up notebooks'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField), 'not-an-email');
-    await tester.tap(find.text('Send code'));
-    await tester.pump();
-    expect(find.text('Enter an email address.'), findsOneWidget);
-    expect(auth.sends, 0);
-
-    await tester.enterText(find.byType(TextField), 'student@school.edu');
-    await tester.tap(find.text('Send code'));
-    await tester.pump();
-    expect(auth.sends, 1);
-    expect(find.text('Resend in 60s'), findsOneWidget);
-    expect(auth.lastEmail, 'student@school.edu');
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
+    expect(find.text('Send code'), findsNothing);
   });
 }
 
-class _SheetAuth implements PaperSyncAuth {
-  var sends = 0;
-  String? lastEmail;
+class _OpenAuth implements PaperSyncAuth {
+  const _OpenAuth();
 
   @override
   SignedInAccount? get current => null;
@@ -53,15 +41,15 @@ class _SheetAuth implements PaperSyncAuth {
   Stream<SignedInAccount?> watchAccount() => const Stream.empty();
 
   @override
-  Future<void> sendEmailCode(String email) async {
-    sends += 1;
-    lastEmail = email;
-  }
+  Future<void> register({
+    required String email,
+    required String password,
+  }) async {}
 
   @override
-  Future<void> verifyEmailCode({
+  Future<void> signInWithPassword({
     required String email,
-    required String code,
+    required String password,
   }) async {}
 
   @override

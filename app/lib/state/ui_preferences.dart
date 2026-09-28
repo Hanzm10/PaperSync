@@ -8,7 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 class UiPreferences {
   const UiPreferences({
     this.inLibrary = false,
-    this.themeMode = ThemeMode.system,
+    this.themeMode = ThemeMode.light,
     this.displayName = '',
     this.email = '',
     this.handwritingOn = true,
@@ -17,6 +17,8 @@ class UiPreferences {
   });
 
   final bool inLibrary;
+
+  /// Light or dark only. [ThemeMode.system] is treated as light.
   final ThemeMode themeMode;
   final String displayName;
   final String email;
@@ -28,11 +30,9 @@ class UiPreferences {
   final bool syncOverMobile;
   final bool exportPdf;
 
-  String get appearanceLabel => switch (themeMode) {
-    ThemeMode.system => 'System',
-    ThemeMode.light => 'Light',
-    ThemeMode.dark => 'Dark',
-  };
+  bool get isDarkAppearance => themeMode == ThemeMode.dark;
+
+  String get appearanceLabel => isDarkAppearance ? 'Dark' : 'Light';
 
   String get exportLabel => exportPdf ? 'PDF' : 'Image';
 
@@ -40,10 +40,14 @@ class UiPreferences {
 
   String get mobileDataLabel => syncOverMobile ? 'On' : 'Off';
 
+  /// Avatar letter. Prefer email when [displayName] is empty so signed-in
+  /// screens can pass a letter without inventing a username.
   String get initial {
     final name = displayName.trim();
-    if (name.isEmpty) return '?';
-    return name[0].toUpperCase();
+    if (name.isNotEmpty) return name[0].toUpperCase();
+    final mail = email.trim();
+    if (mail.isNotEmpty) return mail[0].toUpperCase();
+    return '?';
   }
 
   UiPreferences copyWith({
@@ -80,13 +84,13 @@ class UiPreferencesController extends Notifier<UiPreferences> {
     state = state.copyWith(inLibrary: true);
   }
 
-  void cycleAppearance() {
-    final next = switch (state.themeMode) {
-      ThemeMode.system => ThemeMode.light,
-      ThemeMode.light => ThemeMode.dark,
-      ThemeMode.dark => ThemeMode.system,
-    };
+  void setAppearance(ThemeMode mode) {
+    final next = mode == ThemeMode.dark ? ThemeMode.dark : ThemeMode.light;
     state = state.copyWith(themeMode: next);
+  }
+
+  void toggleAppearance() {
+    setAppearance(state.isDarkAppearance ? ThemeMode.light : ThemeMode.dark);
   }
 
   void toggleHandwriting() {

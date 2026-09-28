@@ -24,7 +24,7 @@ flutter run
 
 The cloud database is the Supabase project [PaperSync](https://supabase.com/dashboard/project/adsemxgqqzefhnqsdbbx/editor). Signed-in users can read and write only their own rows. Writing without an account stays on the phone.
 
-Sign-in is an emailed 6-digit code. The app holds only the project URL and the anon key. The service role key stays on the server.
+Sign-in is email and password. The app holds only the project URL and the anon key. The service role key stays on the server.
 
 To back notebooks up, copy `app/env/example.json` to `app/env/dev.json`, fill in the project URL and the anon key, and run:
 

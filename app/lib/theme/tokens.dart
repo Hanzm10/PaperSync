@@ -40,6 +40,10 @@ abstract final class PaperTokens {
   static const inkBlue = Color(0xFF2563EB);
   static const inkRed = Color(0xFFDC2626);
 
+  /// Dominant opaque blue from the welcome / brand logo background
+  /// (`logo-welcome.png` / `brand/logo-light.png`).
+  static const logoBlue = Color(0xFF065BFA);
+
   static const space2 = 2.0;
   static const space4 = 4.0;
   static const space6 = 6.0;

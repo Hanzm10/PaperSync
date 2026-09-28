@@ -90,10 +90,15 @@ void main() {
     final handle = tester.ensureSemantics();
     await _pump(tester, const LibraryScreen(), libraryModel());
     expect(find.bySemanticsLabel('Search'), findsOneWidget);
-    expect(find.bySemanticsLabel('Saving · 76% battery'), findsOneWidget);
+    expect(find.bySemanticsLabel('Saving · 76% battery'), findsNothing);
     expect(find.bySemanticsLabel('New notebook'), findsOneWidget);
+    expect(find.byTooltip('Library'), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsOneWidget);
     expect(find.bySemanticsLabel(RegExp('Lecture notes')), findsWidgets);
     expect(find.text('Lecture notes'), findsOneWidget);
+    expect(find.text('Search'), findsNothing);
+    expect(find.text('New notebook'), findsNothing);
+    expect(find.text('Settings'), findsNothing);
     handle.dispose();
   });
 

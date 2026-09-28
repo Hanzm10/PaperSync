@@ -41,6 +41,10 @@ void main() {
 
     await tester.enterText(find.byType(TextField).at(0), 'ada@example.com');
     await tester.enterText(find.byType(TextField).at(1), 'secret-pass');
+    expect(find.byTooltip('Show'), findsOneWidget);
+    await tester.tap(find.byTooltip('Show'));
+    await tester.pump();
+    expect(find.byTooltip('Hide'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, 'Sign in'));
     await tester.pump();
     expect(find.textContaining('password is not sent'), findsOneWidget);
@@ -82,11 +86,11 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.tap(find.text('Back'));
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Continue without account'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Settings'));
+      await tester.tap(find.byTooltip('Settings'));
       await tester.pumpAndSettle();
       expect(find.text('Ada'), findsOneWidget);
       expect(find.text('ada@example.com'), findsOneWidget);
@@ -98,7 +102,7 @@ void main() {
       expect(find.text('On this phone'), findsOneWidget);
       expect(find.text('Last sync: not recorded'), findsOneWidget);
 
-      await tester.tap(find.text('Back'));
+      await tester.tap(find.byTooltip('Back'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Comic strip'));
       await tester.pumpAndSettle();

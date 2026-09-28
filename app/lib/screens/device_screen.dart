@@ -36,11 +36,13 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
 
     return Scaffold(
       appBar: AppTopBar(
-        leading: BarAction(
-          label: link.bonded ? 'Back' : 'Close',
-          tooltip: link.bonded ? 'Back' : 'Close',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: link.bonded
+            ? BarBackButton(onPressed: () => Navigator.of(context).pop())
+            : BarAction(
+                label: 'Close',
+                glyph: PaperGlyph.close,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
         title: TopTitle(link.bonded ? 'Pen' : 'Pair your pen'),
         link: link.bonded ? link : null,
       ),

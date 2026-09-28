@@ -34,10 +34,7 @@ class AccountSyncScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppTopBar(
         height: PaperTokens.formBarHeight,
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: const TopTitle('Account and sync'),
       ),
       body: Column(

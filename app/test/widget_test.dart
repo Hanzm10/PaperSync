@@ -61,7 +61,6 @@ void main() {
     await _enterLibrary(tester);
 
     expect(find.text('Library'), findsOneWidget);
-    expect(find.text('Saving'), findsOneWidget);
     expect(find.text('Lecture notes'), findsOneWidget);
 
     await tester.tap(find.text('Lecture notes'));
@@ -144,7 +143,9 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: PaperSyncApp()));
     await _enterLibrary(tester);
 
-    await tester.tap(find.byKey(const Key('status-pill')));
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pen and connection'));
     await tester.pumpAndSettle();
     expect(find.text('Disconnect'), findsOneWidget);
     expect(find.text('Forget'), findsOneWidget);

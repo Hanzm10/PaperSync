@@ -26,10 +26,7 @@ class ComicStripScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppTopBar(
         height: PaperTokens.formBarHeight,
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: const TopTitle('1987 Constitution'),
       ),
       body: ListView(

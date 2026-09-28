@@ -46,10 +46,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     return Scaffold(
       appBar: AppTopBar(
         height: PaperTokens.formBarHeight,
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: const TopTitle('Sign in'),
       ),
       body: Column(
@@ -79,9 +76,9 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   obscure: _obscure,
                   error: _passwordError.isEmpty ? null : _passwordError,
                   onChanged: (_) => setState(() => _passwordError = ''),
-                  suffix: TextButton(
+                  suffix: PasswordVisibilityButton(
+                    obscured: _obscure,
                     onPressed: () => setState(() => _obscure = !_obscure),
-                    child: Text(_obscure ? 'Show' : 'Hide'),
                   ),
                 ),
                 Align(

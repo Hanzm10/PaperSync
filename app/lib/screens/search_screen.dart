@@ -40,10 +40,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     return Scaffold(
       appBar: AppTopBar(
         expandTitle: true,
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: Semantics(
           label: 'Search handwriting',
           textField: true,

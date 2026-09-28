@@ -98,6 +98,7 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                     ),
                     BarAction(
                       label: 'Close',
+                      glyph: PaperGlyph.close,
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],

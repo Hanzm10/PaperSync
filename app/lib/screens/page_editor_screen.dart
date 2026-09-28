@@ -45,10 +45,7 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
 
     return Scaffold(
       appBar: AppTopBar(
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: TopTitle('Page ${page.pageIndex}'),
         link: model.link,
         onStatusTap: () {

@@ -31,10 +31,7 @@ class NotebookPagesScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppTopBar(
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: TopTitle(notebook.name),
         link: model.link,
         onStatusTap: () => _openDevice(context),

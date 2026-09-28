@@ -38,114 +38,123 @@ class SettingsScreen extends ConsumerWidget {
         : '${link.penName} · $battery%';
 
     return Scaffold(
-      appBar: AppTopBar(
+      appBar: const AppTopBar(
         height: PaperTokens.formBarHeight,
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const TopTitle('Settings'),
+        title: TopTitle('Settings'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          PaperTokens.space24,
-          0,
-          PaperTokens.space24,
-          PaperTokens.space28,
-        ),
+      body: Stack(
         children: [
-          const SectionLabel('ACCOUNT'),
-          SettingsTile(
-            title: name,
-            subtitle: email,
-            trailing: Text(
-              'View',
-              style: Theme.of(context).textTheme.labelMedium,
+          ListView(
+            padding: const EdgeInsets.fromLTRB(
+              PaperTokens.space24,
+              0,
+              PaperTokens.space24,
+              PaperTokens.space32 + PaperTokens.minTap * 2,
             ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AccountSyncScreen(),
+            children: [
+              const SectionLabel('ACCOUNT'),
+              SettingsTile(
+                title: name,
+                subtitle: email,
+                trailing: Text(
+                  'View',
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
-              );
-            },
-          ),
-          Divider(height: 1, color: colors.line),
-          const SectionLabel('PAPERSYNC'),
-          SettingsTile(
-            title: 'Pen and connection',
-            subtitle: penLine,
-            trailing: Text(
-              'Open',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const DeviceScreen()),
-              );
-            },
-          ),
-          SettingsTile(
-            title: 'Sync',
-            subtitle: syncRowLabel(status),
-            trailing: Container(
-              width: PaperTokens.statusDotLive,
-              height: PaperTokens.statusDotLive,
-              decoration: BoxDecoration(
-                color: syncDidFail(status)
-                    ? colors.danger
-                    : colors.statusSaving,
-                shape: BoxShape.circle,
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const AccountSyncScreen(),
+                    ),
+                  );
+                },
               ),
-            ),
-            onPressed: () {
-              final next = syncDidFail(status)
-                  ? const SyncIssueScreen()
-                  : const AccountSyncScreen();
-              Navigator.of(context)
-                  .push(MaterialPageRoute<void>(builder: (_) => next));
-            },
-          ),
-          SettingsTile(
-            title: 'Handwriting recognition',
-            trailing: Text(
-              prefs.handwritingLabel,
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            onPressed: prefsController.toggleHandwriting,
-          ),
-          Divider(height: 1, color: colors.line),
-          SettingsTile(
-            title: 'Appearance',
-            trailing: Text(
-              prefs.appearanceLabel,
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            onPressed: prefsController.cycleAppearance,
-          ),
-          SettingsTile(
-            title: 'Export defaults',
-            trailing: Text(
-              prefs.exportLabel,
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            onPressed: prefsController.cycleExport,
-          ),
-          const SizedBox(height: PaperTokens.space16),
-          SettingsTile(
-            title: 'Comic strip',
-            subtitle: 'Page 1 in the design file',
-            trailing: Text(
-              'Open',
-              style: Theme.of(context).textTheme.labelMedium,
-            ),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ComicStripScreen(),
+              Divider(height: 1, color: colors.line),
+              const SectionLabel('PAPERSYNC'),
+              SettingsTile(
+                title: 'Pen and connection',
+                subtitle: penLine,
+                trailing: Text(
+                  'Open',
+                  style: Theme.of(context).textTheme.labelMedium,
                 ),
-              );
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const DeviceScreen(),
+                    ),
+                  );
+                },
+              ),
+              SettingsTile(
+                title: 'Sync',
+                subtitle: syncRowLabel(status),
+                trailing: Container(
+                  width: PaperTokens.statusDotLive,
+                  height: PaperTokens.statusDotLive,
+                  decoration: BoxDecoration(
+                    color: syncDidFail(status)
+                        ? colors.danger
+                        : colors.statusSaving,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                onPressed: () {
+                  final next = syncDidFail(status)
+                      ? const SyncIssueScreen()
+                      : const AccountSyncScreen();
+                  Navigator.of(context)
+                      .push(MaterialPageRoute<void>(builder: (_) => next));
+                },
+              ),
+              SettingsTile(
+                title: 'Handwriting recognition',
+                trailing: Text(
+                  prefs.handwritingLabel,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                onPressed: prefsController.toggleHandwriting,
+              ),
+              Divider(height: 1, color: colors.line),
+              SettingsTile(
+                title: 'Appearance',
+                trailing: Text(
+                  prefs.appearanceLabel,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                onPressed: prefsController.cycleAppearance,
+              ),
+              SettingsTile(
+                title: 'Export defaults',
+                trailing: Text(
+                  prefs.exportLabel,
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                onPressed: prefsController.cycleExport,
+              ),
+              const SizedBox(height: PaperTokens.space16),
+              SettingsTile(
+                title: 'Comic strip',
+                subtitle: 'Page 1 in the design file',
+                trailing: Text(
+                  'Open',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ComicStripScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+          LibraryNavOverlay(
+            onLibrary: () {
+              final navigator = Navigator.of(context);
+              if (navigator.canPop()) navigator.pop();
             },
+            onSettings: () {},
           ),
         ],
       ),

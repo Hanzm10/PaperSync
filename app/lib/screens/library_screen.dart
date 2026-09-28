@@ -34,7 +34,7 @@ class LibraryScreen extends ConsumerWidget {
       appBar: AppTopBar(
         leading: BarAction(
           label: 'Search',
-          tooltip: 'Search',
+          glyph: PaperGlyph.search,
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(builder: (_) => const SearchScreen()),
@@ -42,123 +42,104 @@ class LibraryScreen extends ConsumerWidget {
           },
         ),
         title: const TopTitle('Library'),
-        link: model.link,
-        onStatusTap: () => _openDevice(context),
+        overflow: BarAction(
+          label: 'New notebook',
+          glyph: PaperGlyph.plus,
+          onPressed: () => unawaited(_createNotebook(context, controller)),
+        ),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          if (notice != null)
-            NoticeBanner(
-              message: notice,
-              messageKey: const Key('storage-notice'),
-            ),
-          if (backup != null)
-            NoticeBanner(
-              message: backup,
-              messageKey: const Key('backup-notice'),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const SyncIssueScreen(),
-                  ),
-                );
-              },
-            ),
-          Expanded(
-            child: model.notebooks.isEmpty
-                ? _EmptyLibrary(
-                    bonded: model.link.bonded,
-                    onPrimary: () {
-                      if (model.link.bonded) {
-                        unawaited(_createNotebook(context, controller));
-                      } else {
-                        _openDevice(context);
-                      }
-                    },
-                  )
-                : Column(
-                    children: [
-                      const SizedBox(height: PaperTokens.space12),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: PaperTokens.space16,
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: Wrap(
-                            alignment: WrapAlignment.spaceBetween,
-                            crossAxisAlignment: WrapCrossAlignment.center,
-                            children: [
-                              TextButton(
-                                onPressed: () => _openSettings(context),
-                                child: const Text('Settings'),
-                              ),
-                              TextButton(
-                                onPressed: () =>
-                                    _createNotebook(context, controller),
-                                child: const Text('New notebook'),
-                              ),
-                            ],
-                          ),
-                        ),
+          Column(
+            children: [
+              if (notice != null)
+                NoticeBanner(
+                  message: notice,
+                  messageKey: const Key('storage-notice'),
+                ),
+              if (backup != null)
+                NoticeBanner(
+                  message: backup,
+                  messageKey: const Key('backup-notice'),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const SyncIssueScreen(),
                       ),
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final count = constraints.maxWidth >= 1000
-                                ? 4
-                                : constraints.maxWidth >= 700
-                                ? 3
-                                : 2;
-                            const spacing = PaperTokens.space16;
-                            final width =
-                                (constraints.maxWidth -
-                                    PaperTokens.space24 * 2 -
-                                    spacing * (count - 1)) /
-                                count;
-                            final scaler = MediaQuery.textScalerOf(context);
-                            final textBlock =
-                                PaperTokens.space10 +
-                                scaler.scale(22) +
-                                PaperTokens.space10 +
-                                scaler.scale(18);
-                            final extent = width / pageAspect + textBlock;
-                            return GridView.builder(
-                              padding: const EdgeInsets.fromLTRB(
-                                PaperTokens.space24,
-                                PaperTokens.space4,
-                                PaperTokens.space24,
-                                PaperTokens.space32,
-                              ),
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: count,
-                                    mainAxisSpacing: PaperTokens.space24,
-                                    crossAxisSpacing: spacing,
-                                    mainAxisExtent: extent,
-                                  ),
-                              itemCount: model.notebooks.length,
-                              itemBuilder: (context, index) {
-                                final notebook = model.notebooks[index];
-                                return NotebookCard(
-                                  notebook: notebook,
-                                  onTap: () {
-                                    Navigator.of(context).push(
-                                      MaterialPageRoute<void>(
-                                        builder: (_) => NotebookPagesScreen(
-                                          notebookId: notebook.id,
-                                        ),
+                    );
+                  },
+                ),
+              Expanded(
+                child: model.notebooks.isEmpty
+                    ? _EmptyLibrary(
+                        bonded: model.link.bonded,
+                        onPrimary: () {
+                          if (model.link.bonded) {
+                            unawaited(_createNotebook(context, controller));
+                          } else {
+                            _openDevice(context);
+                          }
+                        },
+                      )
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final count = constraints.maxWidth >= 1000
+                              ? 4
+                              : constraints.maxWidth >= 700
+                              ? 3
+                              : 2;
+                          const spacing = PaperTokens.space16;
+                          final width =
+                              (constraints.maxWidth -
+                                  PaperTokens.space24 * 2 -
+                                  spacing * (count - 1)) /
+                              count;
+                          final scaler = MediaQuery.textScalerOf(context);
+                          final textBlock =
+                              PaperTokens.space10 +
+                              scaler.scale(22) +
+                              PaperTokens.space10 +
+                              scaler.scale(18);
+                          final extent = width / pageAspect + textBlock;
+                          return GridView.builder(
+                            padding: const EdgeInsets.fromLTRB(
+                              PaperTokens.space24,
+                              PaperTokens.space16,
+                              PaperTokens.space24,
+                              PaperTokens.space32 + PaperTokens.minTap * 2,
+                            ),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: count,
+                                  mainAxisSpacing: PaperTokens.space24,
+                                  crossAxisSpacing: spacing,
+                                  mainAxisExtent: extent,
+                                ),
+                            itemCount: model.notebooks.length,
+                            itemBuilder: (context, index) {
+                              final notebook = model.notebooks[index];
+                              return NotebookCard(
+                                notebook: notebook,
+                                onTap: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) => NotebookPagesScreen(
+                                        notebookId: notebook.id,
                                       ),
-                                    );
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
                       ),
-                    ],
-                  ),
+              ),
+            ],
+          ),
+          LibraryNavOverlay(
+            onLibrary: () {},
+            onSettings: () => _openSettings(context),
           ),
         ],
       ),
@@ -202,7 +183,12 @@ class _EmptyLibrary extends StatelessWidget {
     final colors = context.colors;
     return Center(
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(PaperTokens.space32),
+        padding: const EdgeInsets.fromLTRB(
+          PaperTokens.space32,
+          PaperTokens.space32,
+          PaperTokens.space32,
+          PaperTokens.space32 + PaperTokens.minTap * 2,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -220,16 +206,6 @@ class _EmptyLibrary extends StatelessWidget {
             PrimaryButton(
               label: bonded ? 'New notebook' : 'Pair your pen',
               onPressed: onPrimary,
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const SettingsScreen(),
-                  ),
-                );
-              },
-              child: const Text('Settings'),
             ),
           ],
         ),

@@ -28,6 +28,7 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   final TextEditingController _name = TextEditingController();
   final TextEditingController _email = TextEditingController();
   final TextEditingController _password = TextEditingController();
+  var _obscure = true;
   var _nameError = '';
   var _emailError = '';
   var _passwordError = '';
@@ -47,10 +48,7 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
     return Scaffold(
       appBar: AppTopBar(
         height: PaperTokens.formBarHeight,
-        leading: BarAction(
-          label: 'Back',
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        leading: BarBackButton(onPressed: () => Navigator.of(context).pop()),
         title: const TopTitle('Create account'),
       ),
       body: Column(
@@ -85,9 +83,13 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                   label: 'Password',
                   hint: 'Create a password',
                   controller: _password,
-                  obscure: true,
+                  obscure: _obscure,
                   error: _passwordError.isEmpty ? null : _passwordError,
                   onChanged: (_) => setState(() => _passwordError = ''),
+                  suffix: PasswordVisibilityButton(
+                    obscured: _obscure,
+                    onPressed: () => setState(() => _obscure = !_obscure),
+                  ),
                 ),
                 const SizedBox(height: PaperTokens.space8),
                 Text(

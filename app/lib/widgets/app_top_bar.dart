@@ -41,7 +41,6 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
       ],
     );
 
-    final balanced = link == null && overflow == null && !expandTitle;
     return Material(
       color: colors.canvas,
       child: SafeArea(
@@ -52,14 +51,22 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
             padding: const EdgeInsets.symmetric(
               horizontal: PaperTokens.space12,
             ),
-            child: balanced
-                ? Stack(
+            child: expandTitle
+                ? Row(
+                    children: [
+                      leading ?? const SizedBox.shrink(),
+                      Expanded(child: title),
+                      trailing,
+                    ],
+                  )
+                : Stack(
                     alignment: Alignment.center,
                     children: [
                       Row(
                         children: [
                           leading ?? const SizedBox.shrink(),
                           const Spacer(),
+                          trailing,
                         ],
                       ),
                       Padding(
@@ -69,35 +76,7 @@ class AppTopBar extends StatelessWidget implements PreferredSizeWidget {
                         child: title,
                       ),
                     ],
-                  )
-                : Row(
-              children: [
-                Flexible(
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerLeft,
-                    child: leading ?? const SizedBox.shrink(),
                   ),
-                ),
-                Expanded(
-                  flex: expandTitle ? 3 : 2,
-                  child: expandTitle
-                      ? title
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [Flexible(child: title)],
-                        ),
-                ),
-                Flexible(
-                  flex: 2,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    alignment: Alignment.centerRight,
-                    child: trailing,
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

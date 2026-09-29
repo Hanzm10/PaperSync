@@ -34,6 +34,7 @@ void paintStrokes(
   String? selectedId,
   Color accent = const Color(0xFF2563EB),
   Color Function(Color stored)? resolve,
+  double widthScale = 1,
 }) {
   for (final stroke in strokes) {
     if (stroke.deletedAt != null) continue;
@@ -44,10 +45,10 @@ void paintStrokes(
         size,
         stroke,
         color: accent.withValues(alpha: 0.35),
-        widthScale: 2.4,
+        widthScale: widthScale * 2.4,
       );
     }
-    _paintStroke(canvas, size, stroke, color: color, widthScale: 1);
+    _paintStroke(canvas, size, stroke, color: color, widthScale: widthScale);
   }
 }
 

@@ -21,8 +21,19 @@ class PageRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkPage(strokes: page.strokes),
+          InkPage(strokes: page.visibleStrokes, strokeWidthScale: 1.6),
           const SizedBox(height: PaperTokens.space8),
+          if (page.recognizedText.trim().isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: PaperTokens.space4),
+              child: Text(
+                page.recognizedText.trim(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.bodySmall
+                    ?.copyWith(color: colors.ink),
+              ),
+            ),
           Text(
             'Page ${page.pageIndex} · ${formatMonthDay(page.createdAt)}',
             maxLines: 1,

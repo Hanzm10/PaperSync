@@ -10,6 +10,7 @@ import 'package:papersync/state/app_controller.dart';
 import 'package:papersync/state/notebook_store_provider.dart';
 import 'package:papersync/storage/schema.dart';
 import 'package:papersync/widgets/ink_page.dart';
+import 'package:papersync/widgets/page_row.dart';
 
 Future<void> _enterLibrary(WidgetTester tester) async {
   await tester.pumpAndSettle();
@@ -52,6 +53,47 @@ void main() {
     );
     final size = tester.getSize(find.byType(InkPage));
     expect(size.width / size.height, closeTo(pageAspect, 0.01));
+  });
+
+  testWidgets('page cards preview recognized content and visible ink', (
+    tester,
+  ) async {
+    final createdAt = DateTime(2026, 9, 25);
+    final visibleStroke = Stroke(
+      id: 'visible',
+      points: [StrokePoint(xMm: 20, yMm: 30, pressure: 9000, touching: true)],
+      colorArgb: 0xFF1A1A1A,
+      createdAt: createdAt,
+    );
+    final deletedStroke = Stroke(
+      id: 'deleted',
+      points: [StrokePoint(xMm: 40, yMm: 50, pressure: 9000, touching: true)],
+      colorArgb: 0xFF1A1A1A,
+      createdAt: createdAt,
+      deletedAt: createdAt,
+    );
+    final page = NotebookPage(
+      id: 'page-preview',
+      notebookId: 'notebook',
+      pageIndex: 2,
+      createdAt: createdAt,
+      recognizedText: 'Meeting notes and action items',
+      strokes: [visibleStroke, deletedStroke],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Scaffold(
+          body: PageRow(page: page, onTap: () {}),
+        ),
+      ),
+    );
+
+    expect(find.text('Meeting notes and action items'), findsOneWidget);
+    final preview = tester.widget<InkPage>(find.byType(InkPage));
+    expect(preview.strokes, [visibleStroke]);
+    expect(preview.strokeWidthScale, greaterThan(1));
   });
 
   testWidgets('library opens a notebook, the editor, and search', (

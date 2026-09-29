@@ -105,7 +105,13 @@ class NotebookPagesScreen extends ConsumerWidget {
                     (constraints.crossAxisExtent - spacing * (count - 1)) /
                     count;
                 final scaler = MediaQuery.textScalerOf(context);
-                final textBlock = PaperTokens.space8 + scaler.scale(18);
+                final metaLineHeight =
+                    scaler.scale(PaperTokens.metaSize) * PaperTokens.metaHeight;
+                final textBlock =
+                    PaperTokens.space8 +
+                    metaLineHeight * 2 +
+                    PaperTokens.space4 +
+                    metaLineHeight;
                 final extent = width / pageAspect + textBlock;
                 return SliverGrid(
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

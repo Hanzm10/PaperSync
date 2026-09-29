@@ -11,6 +11,7 @@ class InkPage extends StatelessWidget {
     required this.strokes,
     this.hover,
     this.selectedStrokeId,
+    this.strokeWidthScale = 1,
     this.onTapDown,
     this.onPanStart,
     this.onPanUpdate,
@@ -20,6 +21,7 @@ class InkPage extends StatelessWidget {
   final List<Stroke> strokes;
   final StrokePoint? hover;
   final String? selectedStrokeId;
+  final double strokeWidthScale;
   final void Function(Offset mm)? onTapDown;
   final void Function(Offset mm)? onPanStart;
   final void Function(Offset mm, Offset deltaMm)? onPanUpdate;
@@ -37,6 +39,7 @@ class InkPage extends StatelessWidget {
       selectedStrokeId: selectedStrokeId,
       ink: colors.ink,
       accent: colors.accent,
+      strokeWidthScale: strokeWidthScale,
     );
     final sheet = DecoratedBox(
       decoration: BoxDecoration(
@@ -99,6 +102,7 @@ class InkSheetPainter extends CustomPainter {
     required this.selectedStrokeId,
     required this.ink,
     required this.accent,
+    required this.strokeWidthScale,
   });
 
   final List<Stroke> strokes;
@@ -106,6 +110,7 @@ class InkSheetPainter extends CustomPainter {
   final String? selectedStrokeId;
   final Color ink;
   final Color accent;
+  final double strokeWidthScale;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -115,6 +120,7 @@ class InkSheetPainter extends CustomPainter {
       strokes,
       selectedId: selectedStrokeId,
       accent: accent,
+      widthScale: strokeWidthScale,
       resolve: (stored) =>
           stored.toARGB32() == AppColors.storedInk.toARGB32() ? ink : stored,
     );
@@ -127,6 +133,7 @@ class InkSheetPainter extends CustomPainter {
         oldDelegate.hover != hover ||
         oldDelegate.selectedStrokeId != selectedStrokeId ||
         oldDelegate.ink != ink ||
-        oldDelegate.accent != accent;
+        oldDelegate.accent != accent ||
+        oldDelegate.strokeWidthScale != strokeWidthScale;
   }
 }

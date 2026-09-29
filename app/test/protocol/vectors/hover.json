@@ -1,0 +1,25 @@
+{
+  "hex": "010001000a000000e8030000b80b881300000208",
+  "expect": {
+    "ok": true,
+    "droppedBytes": 0,
+    "notification": {
+      "version": 1,
+      "headerFlags": 0,
+      "bootId": 1,
+      "firstSeq": 10,
+      "baseTimeMs": 1000,
+      "samples": [
+        {
+          "seq": 10,
+          "tDeviceMs": 1008,
+          "xMm": 15.0,
+          "yMm": 25.0,
+          "pressure": 0,
+          "flags": 2,
+          "dtMs": 8
+        }
+      ]
+    }
+  }
+}

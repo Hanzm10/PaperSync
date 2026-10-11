@@ -1,0 +1,6 @@
+# Local defines for the app. The example file is safe to commit.
+app/env/*.json
+!app/env/example.json
+
+# Raw Figma REST responses and renders. Derived tokens and assets are committed.
+design/figma-cache/

@@ -1,0 +1,7 @@
+{
+  "hex": "020001000a000000e8030000",
+  "expect": {
+    "ok": false,
+    "reason": "badVersion"
+  }
+}

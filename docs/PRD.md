@@ -2,6 +2,7 @@
 
 Status: draft 1 for review. Scope: the phone app and its cloud backup. Firmware and the tablet hardware are covered only where the app depends on them.
 Target: working demo in early November 2026.
+Hardware source of truth: the PaperSync SSOT document shared by Hanz on 2026-10-11, plus the captured packet in `docs/hid-t605.md`. Where it differs from `docs/protocol-v1.md`, section 8.1 says which one wins.
 
 ## 1. Summary
 
@@ -101,6 +102,8 @@ The hardware side runs a test to decide whether the ESP32 can read the tablet. T
 | ESP32 reads the tablet and forwards over BLE | Bluetooth is the main path. USB cable ships as an Android option. iOS supported. |
 | ESP32 cannot read the tablet | Hybrid becomes the main Android path. iOS has no pen data path and ships as a library viewer only (R1). |
 
+The SSOT says the tablet's six hardware keys did not work over Android OTG. That implies the pen interface was reachable from an Android phone, which is encouraging but not proof until the Report ID 9 stream is read inside the app on the Samsung.
+
 USB transport work starts now, in parallel, so the gate decides what is promoted in the UI, not whether the code exists.
 
 ## 6. Functional requirements
@@ -109,26 +112,27 @@ Priorities: P0 is needed for the demo, P1 should make it, P2 is later.
 
 ### 6.1 Pairing and Bluetooth (existing, harden)
 
-- FR-B1 (P0). Scan lists only devices advertising the PaperSync service (`6f0c2d14-...`). Pair once, pin the device, auto reconnect only to the pinned device.
+- FR-B1 (P0). Scan lists only devices advertising the PaperSync service (`6f0c2d14-...`). Pair once, pin the device, auto reconnect only to the pinned device. The UUIDs in `docs/protocol-v1.md` are locked and replace the placeholder UUID in the SSOT.
 - FR-B2 (P0). Link states shown to the user: Connected, Reconnecting, Disconnected, plus Saving when buffered data is being replayed. Reconnect uses capped exponential backoff with jitter.
 - FR-B3 (P0). Replayed samples (header flag 0x01) are merged without duplicating strokes already drawn live. Matching uses `boot_id` and `seq`.
-- FR-B4 (P1). Negotiate the largest MTU the phone offers. Packets stay at most 512 bytes (62 records).
+- FR-B4 (P0). Android requests an MTU of 185 or more right after connecting and before subscribing (`requestMtu`, Android only). iOS negotiates by itself, so the app reads the final MTU and logs it in debug. Firmware sizes each notification to the negotiated MTU minus 3 bytes. At MTU 185 that is 17 records of 10 bytes plus the header, about 20 notifications per second at 330 samples per second. The SSOT's figure of 25 samples per notification assumed smaller records. Packets never exceed 512 bytes.
 - FR-B5 (P0). Battery comes from the standard Battery Service. If absent, the battery pill is hidden, never faked.
 - FR-B6 (P1). Show firmware version only when the device exposes Device Information (0x180A). Otherwise hide the row.
+- FR-B7 (P0). A compact link and battery indicator is visible on every main screen (Library, Capture, Search, page view), not only in Pen settings. "Is my writing being saved right now" must be answerable at a glance.
 
 ### 6.2 USB cable mode (Android, new)
 
-- FR-U1 (P0). A new `UsbPenTransport` implements `PenTransport`. It emits the same v1 notification bytes the Bluetooth path emits, so the codec, capture and storage code stay unchanged.
+- FR-U1 (P0). A new `UsbPenTransport` implements `PenTransport`. It emits the same notification bytes the Bluetooth path emits (section 8.1), so the codec, capture and storage code stay unchanged.
 - FR-U2 (P0). Device discovery uses Android `UsbManager`. The scan result lists attached USB devices that match the known tablet (vendor and product id from the hardware capture, section 8.2). Other devices are ignored.
 - FR-U3 (P0). The app requests USB permission with the system dialog and handles three outcomes: granted, denied, device removed during the prompt. Denial shows a one line explanation and a retry.
 - FR-U4 (P0). Declare a `usb-device` filter in the manifest so plugging in the tablet can offer to open PaperSync. Without a match the app does nothing on plug in.
-- FR-U5 (P0). After permission: claim the HID interface (force claim, so Android's own HID handling lets go), send SET_IDLE, read interrupt IN reports continuously on a background isolate or native thread, and parse report ID 9 (position, pressure, tilt). Report ID 5 (position only) is ignored while ID 9 is present.
-- FR-U6 (P0). Convert each HID report to a v1 record. The transport owns `boot_id` (random per connection), `first_seq` (counts from 0 per connection), and `base_time_ms` (monotonic milliseconds since connect). Pack up to 62 records or 255 ms into one notification, whichever comes first.
-- FR-U7 (P0). Pen lifts and hovers map to flags: touching when pressure is above zero and the pen is in contact, hover when in range but not touching. Pen leaving range flushes the batch immediately.
+- FR-U5 (P0). After permission: find the HID interface whose interrupt IN endpoint is `0x84` and whose reports start with `0x09` (the capture shows device address 10, endpoint 4 IN, 10 byte transfers). Force claim it so Android's own HID handling lets go, send SET_IDLE, and read interrupt IN reports continuously on a native thread. The Report ID 5 interface is ignored.
+- FR-U6 (P0). Wrap raw Report ID 9 reports into the notification format in section 8.1. The transport owns `boot_id` (random per connection), `first_seq` (counts from 0 per connection) and `base_time_ms` (monotonic milliseconds since connect), and sets `dt_ms` per record. Pack up to 17 records or 50 ms into one notification, whichever comes first.
+- FR-U7 (P0). Touching comes from the Tip Switch flag (bit 0), hover from In Range (bit 6), never from pressure above zero. The captured hover sample has pressure 29 with the tip up. Flags are forwarded unchanged, including bit 7, which was set in the sample. Pen leaving range flushes the batch immediately.
 - FR-U8 (P0). Unplugging the cable moves the link to Disconnected within 1 s and ends the open stroke. Plugging in again reconnects without asking permission again when Android already granted it.
 - FR-U9 (P0). Mistakes in HID data (short report, wrong report id, values out of range) are dropped and counted, never thrown. Same untrusted-bytes rules as Bluetooth.
 - FR-U10 (P1). If the tablet needs more than SET_IDLE to start streaming (SET_PROTOCOL, SET_REPORT), the transport sends them from a small table keyed by vendor and product id.
-- FR-U11 (P1). Tilt and azimuth are decoded and carried in the transport layer but not stored until the data model has fields for them (see 8.3).
+- FR-U11 (P1). Tilt bytes are decoded and carried through the transport and into `StrokePoint`. Storing them needs the migration in 8.3.
 - FR-U12 (P1). Show a power warning if the tablet browns out the phone port (device resets within 5 s of connect). Suggest a powered adapter.
 - Battery for the USB path: the tablet reports none, so the pill shows the controller battery in hybrid mode and is hidden otherwise.
 
@@ -139,8 +143,8 @@ Implementation note: Flutter has no first-party HID over USB plugin. Write a sma
 In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accessory.
 
 - FR-X1 (P0). The app connects to the controller with the same pairing flow as 6.1 while ink comes from USB.
-- FR-X2 (P0). A page marker from the controller (BOOT button) starts a new page. The app inserts a marker at the current time into the capture timeline, the same effect as a record with the page marker flag (0x04) in the existing codec.
-- FR-X3 (P0). Decided: the marker is a normal notification on the existing stroke characteristic with a single record, flags `0x04`, x and y zero. It reuses the codec and needs no new characteristic. Firmware sends it the same way in both Bluetooth and hybrid mode.
+- FR-X2 (P0). A page marker from the controller's physical page button starts a new page. The button is wired to a spare ESP32 GPIO (the BOOT button on the dev board until the final button exists). The app closes the current page and opens the next one at that point in the timeline.
+- FR-X3 (P0). Wire form: the page button is bit 1 of `header_flags` on a notification (section 8.1). A notification with no records is allowed, so firmware can send it the moment the button is pressed. This replaces the earlier idea of a record flag, because bit 2 of the raw HID flags is Eraser.
 - FR-X4 (P1). Controller LED status (connected, capturing, low battery) is driven by firmware from its own state. The app does not write to it in this release.
 - FR-X5 (P0). If the controller is not connected in hybrid mode, capture still works. A new page then needs an on-screen New page button. Show a quiet "Controller not connected" note, not an error.
 
@@ -173,7 +177,7 @@ Ink is captured, not drawn. The editor is for viewing and tidying.
 - FR-E1 (P0). View a page with pinch zoom, pan, and a "Page 12 of 24" header with swipe or arrows to move between pages.
 - FR-E2 (P0). Undo and redo (in memory, as already decided in `docs/decisions.md`).
 - FR-E3 (P0). Eraser: tap a stroke to remove it. Removal is a tombstone, so it syncs and can be undone.
-- FR-E4 (P1). Lasso select: choose strokes, then delete or recolor them. Copy and paste are P2.
+- FR-E4 (P1). Lasso select: choose strokes, then delete, recolor, or move them. Copy and paste are P2.
 - FR-E5 (P1). Ink display style: color and a width multiplier for a selection or the whole page. This changes rendering only. Raw stroke data is never altered.
 - FR-E6 (P1). Paper style per notebook: blank, dotted, lined, grid. Display and export only.
 - FR-E7 (P2). Minimap while zoomed.
@@ -276,38 +280,71 @@ The reference image's fifth tab is Sync. Sync is a state, not a place, so it bec
 
 ## 8. Data, protocol and hardware dependencies
 
-### 8.1 Protocol v1
+### 8.1 BLE wire format
 
-Unchanged. Positions are 1/200 mm, pressure 0 to 16383, 12 byte header, 8 byte records, 512 byte cap. See `docs/protocol-v1.md`.
+The SSOT (section 3.3) is the source of truth for what the tablet sends. `docs/protocol-v1.md` is what the app implements today. They differ, so this section says what the app will implement.
 
-### 8.2 Tablet HID (USB cable mode)
+| Topic | SSOT | App today (v1) | Decision |
+| --- | --- | --- | --- |
+| Record | 10 byte raw HID Report ID 9, byte 0 is `0x09` | 8 byte record in 1/200 mm, no tilt | 10 byte record with tilt |
+| Units | Raw tablet units, app converts to mm | Firmware sends 1/200 mm | Raw units, app calibrates (SSOT wins) |
+| Order and replay | None, firmware flushes its buffer on reconnect | Header with `boot_id`, `first_seq`, `base_time_ms`, replay flag | Keep the header (v1 wins) |
+| Page marker | "Flag bit 2" | Record flag `0x04` | Header flag, see below. Raw HID bit 2 is Eraser, so neither works as written |
+| Service UUID | Placeholder | `6f0c2d14-...` locked | Keep the locked UUIDs |
+| Battery | Battery Service `0x180F` | Same | Same |
 
-Source of truth is the Wireshark capture of the T605 (Lumispark / VINSA). Record the following in a new `docs/hid-t605.md` before USB work is accepted:
+**Protocol v2 (proposed, needs a yes from the firmware owner before firmware depends on it).**
+
+- Header: 12 bytes, same layout as v1, with `version = 2`. `header_flags` bit 0 is replayed samples, bit 1 is page button pressed.
+- Record: 10 bytes, all little endian. Byte 0 is `dt_ms`, an offset from the header's `base_time_ms`. It replaces the Report ID byte, which is always `0x09` and carries no information. Bytes 1 to 9 are identical to HID report bytes 1 to 9: flags, X, Y, pressure, tilt A, tilt B.
+- Page button: a notification with `header_flags` bit 1 set means a new page starts before its first record. It may carry zero records. Firmware sends it immediately on press.
+- Size: at MTU 185, 17 records per notification. At the 512 byte cap, 50 records.
+- The app decoder accepts versions 1 and 2 during the transition, so the simulator and existing tests keep working.
+
+Why not the SSOT format exactly:
+
+1. Raw HID flags use bit 2 for Eraser, so a page marker on the same bit would be read as an eraser stroke.
+2. Notifications are not acknowledged. After a reconnect the firmware cannot know what the phone received, so without a sequence number the app cannot tell lost, duplicated and replayed samples apart.
+3. Without timing, a replayed burst loses when the points were written. ML Kit recognizes better with timestamps.
+
+If the firmware owner keeps the SSOT format as written, the app can still decode it (byte 0 is `0x09`), but gap detection and replay dedupe are off, timing is synthesized at about 3 ms per sample, and the page button needs another channel such as a second characteristic.
+
+The captured packet `09 c0 fe 3d 50 5c 1d 00 e3 e5` is a codec test vector for either format.
+
+### 8.2 Tablet HID (USB cable mode and firmware input)
+
+Full detail is in `docs/hid-t605.md`. Report ID 9 is 10 bytes: report id, flags (bit 0 tip, bit 1 barrel, bit 2 eraser, bit 6 in range), X u16 (0 to 32767), Y u16 (0 to 32767), pressure u16 (0 to 16383), two signed tilt bytes. The interrupt IN endpoint is `0x84`.
+
+Still needed before USB work is accepted:
 
 - Vendor id and product id.
-- Interface number and the interrupt IN endpoint (observed `0x84`).
-- Report ID 9 byte map: 10 bytes. Which bytes are status, x, y, pressure (16,384 levels), tilt, azimuth, and their byte order and logical ranges.
-- Required setup requests (Windows sent SET_IDLE).
+- Meaning of flag bit 7, which the sample has set while the SSOT calls it padding.
+- Whether bytes 8 and 9 are azimuth and altitude or X tilt and Y tilt. The sample (-29, -27) looks like tilt in degrees.
+- Four corner raw values per axis. X and Y both report 0 to 32767 over 170 by 107 mm, so each axis needs its own scale.
+- Whether Android needs the SET_IDLE that Windows sent.
 
-Mapping to v1: scale x and y from the tablet's logical range to 1/200 mm across the 170 by 107 mm active area. Clamp pressure to 16383. Axis orientation and any flip are set per device profile, not hard coded.
+Mapping to millimetres: `xMm = (x - xMin) * 170 / (xMax - xMin)` and the same for Y with 107, using the measured corners. The numbers live in a device profile keyed by vendor and product id. An in-app calibration screen is P2.
 
 ### 8.3 Data model changes
 
-- Add optional tilt and azimuth to the in-memory stroke point only after a storage migration is written and tested. Until then they are dropped after the transport. (Stroke points are stored as packed bytes locally and on the server, 16 bytes per point in the code (`app/lib/storage/points.dart`) and in `0001_init.sql`, so adding fields means a versioned migration on both. `docs/decisions.md` and `docs/plans/` still say 12 and should be corrected. The 10 byte figure is the tablet's Report ID 9, a different thing.)
-- Add `recognizedText` language and status (`none`, `pending`, `done`, `failed`) to pages. Migration required.
-- Add per-notebook `paperStyle`. Migration required.
-- Add `starred` on pages. Migration required.
+- Tilt: the SSOT puts azimuth and altitude on `StrokePoint`. Stored points are packed bytes, 16 per point (float32 x, float32 y, uint16 pressure, uint16 flags, uint32 time) in `app/lib/storage/points.dart` and `0001_init.sql`. Two more bytes make 18, which needs a versioned migration on the phone and on the server. P1. Until it ships, tilt is dropped after the transport. The SSOT's schema with `points jsonb` is out of date. Keep packed bytes, which are smaller and size checked.
+- Flags: add barrel and eraser to the stored flags if bits are free. Check before changing the layout.
+- `docs/decisions.md` and `docs/plans/` still say 12 bytes per point. They should say 16.
+- Add recognized text language and status (`none`, `pending`, `done`, `failed`) to pages.
+- Add per-notebook `paperStyle` and per-page `starred`.
+- Each needs a migration.
 
 ### 8.4 What the app needs from hardware and firmware
 
 | Need | From | Detail |
 | --- | --- | --- |
-| Tablet vendor id, product id, report 9 map | Hardware | Section 8.2 |
-| BLE service and stroke characteristic per v1 | Firmware | When ESP32 reads the tablet |
-| Page marker as a flagged record (or a new characteristic) | Firmware | FR-X3 |
-| Battery Service | Firmware | Standard 0x180F |
-| ESP32 host result (works or not) | Hardware | Decision gate 5.2 |
-| In hybrid mode: BLE controller with button and battery only | Firmware | Smaller scope than the full forwarder |
+| Vendor id, product id, flag bit 7, tilt naming, corner values | Hardware | Section 8.2 |
+| Firmware reads the Report ID 9 interface (endpoint `0x84`) | Firmware | The tablet also has the Report ID 5 interface |
+| Notifications per section 8.1, sized to the negotiated MTU | Firmware | Needs a yes on v2 |
+| RAM ring buffer, flushed in order on reconnect with the replay flag set | Firmware | SSOT 3.5. RAM only is enough for the demo |
+| Page button on a spare GPIO | Hardware and firmware | BOOT button for now. Housing or clip-on module is still open |
+| Battery Service `0x180F` | Firmware | Standard |
+| ESP32 host test result | Hardware | Decision gate in 5.2 |
 
 ## 9. Non-functional requirements
 
@@ -343,7 +380,7 @@ About three weeks from 2026-10-11.
 
 | Week | Software | Hardware dependency |
 | --- | --- | --- |
-| 1 (Oct 12 to 18) | Record HID map and ids. Kotlin USB channel that reads raw reports from the tablet on a real Android phone. HID to v1 packetizer with unit tests from captured bytes. Fix `PageRow` repaint and grid height. Theme tokens and bottom bar. | Host test result. HID capture bytes. |
+| 1 (Oct 12 to 18) | Record HID map and ids. Kotlin USB channel that reads raw reports from the tablet on a real Android phone. HID to v1 packetizer with unit tests from captured bytes. Fix `PageRow` repaint and grid height. Theme tokens and bottom bar. | Host test result. Vendor and product id. Corner values. |
 | 2 (Oct 19 to 25) | USB mode end to end in the app, with hot unplug and reconnect. Controller link and page marker. Connection setting and plug-in prompt. Library, search and capture restyled. ML Kit recognition and model download flow. | Firmware: marker and battery. |
 | 3 (Oct 26 to Nov 1) | Editor (eraser, lasso, ink style, paper style). Export fit. Real sync switches. Recovery and soak tests. Latency and battery measurements. Demo script and bug fixing. | Hardware freeze. |
 | Buffer | Early November | |
@@ -368,16 +405,23 @@ Cut order if time runs out: lasso and ink style, paper style, starred pages and 
 Decided:
 
 - Demo devices are a Samsung Android phone and an iPhone (Bluetooth test).
-- Page marker is a flagged record on the stroke characteristic (FR-X3).
 - No background capture. The screen stays awake during capture (FR-K7).
 - Recognition is English only.
+- UUIDs from `docs/protocol-v1.md` are locked.
+- Page button is `header_flags` bit 1 (FR-X3). This replaces the earlier record-flag idea.
+- Firmware buffer is RAM only for the demo.
+
+Needs a yes from the firmware owner:
+
+- D1. Protocol v2 in section 8.1 instead of the SSOT format exactly.
 
 Still open:
 
-1. Tablet vendor id, product id, and the exact Report ID 9 byte layout (section 8.2). Needed before USB work can be accepted. The Wireshark capture has them.
+1. Vendor id, product id, flag bit 7, tilt naming, corner values (section 8.2).
 2. The Samsung model, so USB host support and permission behavior can be checked.
 3. Is cloud-synced search on a second device needed for the demo, or is on-phone recognition enough? (FR-S6 is P1.)
 4. Is the app name and logo staying as is, given the visual refresh?
+5. Page button on the tablet housing or a clip-on module (hardware).
 
 ## 14. Acceptance tests
 

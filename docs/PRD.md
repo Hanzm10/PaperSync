@@ -140,7 +140,7 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 
 - FR-X1 (P0). The app connects to the controller with the same pairing flow as 6.1 while ink comes from USB.
 - FR-X2 (P0). A page marker from the controller (BOOT button) starts a new page. The app inserts a marker at the current time into the capture timeline, the same effect as a record with the page marker flag (0x04) in the existing codec.
-- FR-X3 (P1). Proposed wire form for the marker, to confirm with the firmware owner: the controller sends one notification on the existing stroke characteristic with a single record, flags `0x04`, x and y zero. This reuses the codec and needs no new characteristic. The alternative is a new characteristic. Decide before firmware work starts.
+- FR-X3 (P0). Decided: the marker is a normal notification on the existing stroke characteristic with a single record, flags `0x04`, x and y zero. It reuses the codec and needs no new characteristic. Firmware sends it the same way in both Bluetooth and hybrid mode.
 - FR-X4 (P1). Controller LED status (connected, capturing, low battery) is driven by firmware from its own state. The app does not write to it in this release.
 - FR-X5 (P0). If the controller is not connected in hybrid mode, capture still works. A new page then needs an on-screen New page button. Show a quiet "Controller not connected" note, not an error.
 
@@ -152,7 +152,7 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 - FR-K4 (P0). A page marker closes the current page and opens the next in the same notebook. An empty page is not created twice in a row.
 - FR-K5 (P0). Target notebook for capture is chosen before writing starts (last used by default). Changing it mid-capture applies from the next page.
 - FR-K6 (P0). Checkpoint the open stroke every 500 ms and on app pause. Recover exactly once after a crash.
-- FR-K7 (P1). Capture keeps running with the screen off or the app in the background on Android (foreground service with a persistent notification), and stops cleanly when the user ends it.
+- FR-K7 (P1). Capture needs the app in the foreground. The screen stays awake while Live Capture is open. If the app is backgrounded, the open stroke is saved and the link state shows Paused. No foreground service in this release.
 - FR-K8 (P1). Undo last stroke and redo while capturing. Undo only affects the app's copy and never touches paper.
 - FR-K9 (P2). Zoom and pan the capture canvas with a minimap.
 
@@ -186,7 +186,7 @@ Ink is captured, not drawn. The editor is for viewing and tidying.
 - FR-S4 (P0). Recognition is queued and runs off the UI thread. A page can be marked Not recognized yet. A failure never blocks capture or saving.
 - FR-S5 (P0). Language model download is explicit: Settings shows the language, size, and a download button. Recognition is off until a model is present. (ML Kit downloads models on demand.)
 - FR-S6 (P1). Recognized text is stored on the page and synced to `page_text` so a second device can search without recomputing.
-- FR-S7 (P1). Recognition language selectable (English default).
+- FR-S7 (P2). Recognition is English only in this release. Other languages later.
 - FR-S8 (P2). Reindex all pages from Settings.
 
 Honest limit: recognition quality depends on the writer, the language model and stroke quality. The success target is 8 of 10 test words, not full transcription.
@@ -293,7 +293,7 @@ Mapping to v1: scale x and y from the tablet's logical range to 1/200 mm across 
 
 ### 8.3 Data model changes
 
-- Add optional tilt and azimuth to the in-memory stroke point only after a storage migration is written and tested. Until then they are dropped after the transport. (Stroke points are stored as packed bytes locally and on the server, so adding fields means a versioned migration on both. The README and `docs/decisions.md` disagree on the point size, 16 versus 12 bytes. Settle that first.)
+- Add optional tilt and azimuth to the in-memory stroke point only after a storage migration is written and tested. Until then they are dropped after the transport. (Stroke points are stored as packed bytes locally and on the server, 16 bytes per point in the code (`app/lib/storage/points.dart`) and in `0001_init.sql`, so adding fields means a versioned migration on both. `docs/decisions.md` and `docs/plans/` still say 12 and should be corrected. The 10 byte figure is the tablet's Report ID 9, a different thing.)
 - Add `recognizedText` language and status (`none`, `pending`, `done`, `failed`) to pages. Migration required.
 - Add per-notebook `paperStyle`. Migration required.
 - Add `starred` on pages. Migration required.
@@ -318,7 +318,7 @@ Mapping to v1: scale x and y from the tablet's logical range to 1/200 mm across 
 - **Security.** All bytes from BLE and USB are untrusted. Local data AES-256, key in Keychain or Keystore, Android backup off. Row level security forced on every table. No tokens or emails in logs. Debug tools only in debug builds.
 - **Privacy.** Recognition is on device. Nothing leaves the phone without sign in.
 - **Accessibility.** Dynamic type up to 200 percent, screen reader labels on every control, contrast per 7.1.
-- **Platforms.** Android 8.0 and up (OTG needs Android 3.1 host support, practically all current phones). iOS 15 and up for Bluetooth. Confirm the phone supports USB host before offering USB mode.
+- **Platforms.** Demo devices: a Samsung Android phone for Bluetooth and USB, and an iPhone for Bluetooth only. Android 8.0 and up (OTG needs Android 3.1 host support, practically all current phones). iOS 15 and up for Bluetooth. Confirm the phone supports USB host before offering USB mode.
 - **Quality bar** (from the existing plan, still applies): strict lints, sealed classes, no `dynamic`, layer rules enforced by `test/architecture_test.dart`, `pubspec.lock` committed, dependency vulnerability scan before each merge.
 
 ## 10. Architecture changes
@@ -360,19 +360,24 @@ Cut order if time runs out: lasso and ink style, paper style, starred pages and 
 | R4 | Tablet draws more current than a phone port gives | Low to medium | High | Measure early. Document a powered adapter. |
 | R5 | ML Kit accuracy on student handwriting is poor | Medium | Medium | Set the target at words, not transcripts. Search by partial match. Show confidence-free results. |
 | R6 | BLE throughput at 200 Hz drops samples | Low | Medium | MTU negotiation, batching, replay buffer in firmware, sequence gaps surfaced. |
-| R7 | Foreground service and background limits kill capture on some phones | Medium | Medium | Battery optimization guidance, user-visible notification, test on two vendors. |
+| R7 | Samsung One UI power management or USB permission behavior differs from stock Android | Medium | Medium | Keep capture in the foreground with the screen awake (FR-K7). Test the USB permission flow on the actual Samsung model early. |
 | R8 | Schedule | High | High | Cut order in section 11. |
 
-## 13. Open questions
+## 13. Decisions and open questions
 
-1. Phone targets: which Android phone models will be used for the demo, and do you have an iPhone to test Bluetooth on?
-2. What are the tablet's vendor id, product id, and the exact Report ID 9 byte layout? They are needed for FR-U2 and section 8.2.
-3. Page marker wire form: reuse a flagged record (FR-X3, recommended) or add a characteristic?
-4. In the Bluetooth main path, does the firmware owner want the page button on the same device as the forwarder (BOOT button)? The PRD assumes yes.
-5. Recognition languages besides English needed for the demo?
-6. Is a cloud-synced search on a second device needed for the demo, or is on-phone recognition enough? (FR-S6 is P1.)
-7. Should Android capture keep running with the screen off (FR-K7)? It adds a foreground service and a notification.
-8. Is the app name and logo staying as is, given the visual refresh?
+Decided:
+
+- Demo devices are a Samsung Android phone and an iPhone (Bluetooth test).
+- Page marker is a flagged record on the stroke characteristic (FR-X3).
+- No background capture. The screen stays awake during capture (FR-K7).
+- Recognition is English only.
+
+Still open:
+
+1. Tablet vendor id, product id, and the exact Report ID 9 byte layout (section 8.2). Needed before USB work can be accepted. The Wireshark capture has them.
+2. The Samsung model, so USB host support and permission behavior can be checked.
+3. Is cloud-synced search on a second device needed for the demo, or is on-phone recognition enough? (FR-S6 is P1.)
+4. Is the app name and logo staying as is, given the visual refresh?
 
 ## 14. Acceptance tests
 

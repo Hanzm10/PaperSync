@@ -51,6 +51,42 @@ String lastSyncLine(SyncStatus status) {
   };
 }
 
+/// Signs in and returns the message to show when it fails, or null on
+/// success. Screens call this instead of importing the sync layer.
+Future<String?> signInAttempt(
+  PaperSyncAuth auth, {
+  required String email,
+  required String password,
+  required String fallback,
+}) async {
+  try {
+    await auth.signInWithPassword(email: email, password: password);
+    return null;
+  } on AuthRejected catch (error) {
+    return error.message;
+  } on Object {
+    return fallback;
+  }
+}
+
+/// Creates the account and returns the message to show when it fails, or
+/// null on success.
+Future<String?> registerAttempt(
+  PaperSyncAuth auth, {
+  required String email,
+  required String password,
+  required String fallback,
+}) async {
+  try {
+    await auth.register(email: email, password: password);
+    return null;
+  } on AuthRejected catch (error) {
+    return error.message;
+  } on Object {
+    return fallback;
+  }
+}
+
 final backupReadyProvider = Provider<bool>((ref) {
   return ref.watch(paperSyncAuthProvider) is! DisabledAuth;
 });

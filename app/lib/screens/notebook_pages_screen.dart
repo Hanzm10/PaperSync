@@ -63,24 +63,27 @@ class NotebookPagesScreen extends ConsumerWidget {
             ),
             sliver: SliverToBoxAdapter(
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  PrimaryButton(
-                    key: const Key('live-page-button'),
-                    label: connected ? 'Live page' : 'Connect pen',
-                    onPressed: () {
-                      if (connected) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                LiveCaptureScreen(notebookId: notebookId),
-                          ),
-                        );
-                      } else {
-                        _openDevice(context);
-                      }
-                    },
+                  Flexible(
+                    child: PrimaryButton(
+                      key: const Key('live-page-button'),
+                      label: connected ? 'Live page' : 'Connect pen',
+                      onPressed: () {
+                        if (connected) {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) =>
+                                  LiveCaptureScreen(notebookId: notebookId),
+                            ),
+                          );
+                        } else {
+                          _openDevice(context);
+                        }
+                      },
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: PaperTokens.space12),
                   BarAction(
                     label: 'New page',
                     glyph: PaperGlyph.plus,

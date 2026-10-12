@@ -7,10 +7,18 @@ import '../theme/tokens.dart';
 import 'ink_page.dart';
 
 class PageRow extends StatelessWidget {
-  const PageRow({super.key, required this.page, required this.onTap});
+  const PageRow({
+    super.key,
+    required this.page,
+    required this.onTap,
+    this.live = false,
+  });
 
   final NotebookPage page;
   final VoidCallback onTap;
+
+  /// True for the page the pen is writing into.
+  final bool live;
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +29,36 @@ class PageRow extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          InkPage(strokes: page.visibleStrokes, strokeWidthScale: 1.6),
+          Stack(
+            children: [
+              InkPage(strokes: page.visibleStrokes, strokeWidthScale: 1.6),
+              if (live)
+                Positioned(
+                  top: PaperTokens.space8,
+                  left: PaperTokens.space8,
+                  child: DecoratedBox(
+                    key: const Key('live-badge'),
+                    decoration: BoxDecoration(
+                      color: colors.accent,
+                      borderRadius: BorderRadius.circular(
+                        PaperTokens.radiusButton,
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: PaperTokens.space8,
+                        vertical: PaperTokens.space4,
+                      ),
+                      child: Text(
+                        'Live',
+                        style: Theme.of(context).textTheme.labelSmall
+                            ?.copyWith(color: colors.onAccent),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
           const SizedBox(height: PaperTokens.space8),
           if (page.recognizedText.trim().isNotEmpty)
             Padding(

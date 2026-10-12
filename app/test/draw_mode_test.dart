@@ -8,6 +8,7 @@ import 'package:papersync/screens/live_capture_screen.dart';
 import 'package:papersync/state/app_controller.dart';
 import 'package:papersync/state/pen_transport_provider.dart';
 import 'package:papersync/theme/app_theme.dart';
+import 'package:papersync/widgets/zoomable_sheet.dart';
 
 void main() {
   ProviderContainer containerWith(SimulatedPenTransport transport) {
@@ -172,8 +173,7 @@ void main() {
     final container = ProviderScope.containerOf(
       tester.element(find.byType(LiveCaptureScreen)),
     );
-    final sheet = find.byType(CustomPaint).last;
-    final start = tester.getCenter(sheet);
+    final start = tester.getCenter(find.byType(ZoomableSheet));
     final gesture = await tester.startGesture(start);
     await gesture.moveBy(const Offset(40, 10));
     await gesture.moveBy(const Offset(40, 10));

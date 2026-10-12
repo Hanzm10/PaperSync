@@ -154,7 +154,7 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 - FR-K2 (P0). Strokes render within one frame of arrival. Pressure drives line width.
 - FR-K3 (P0). Hover shows a small cursor dot, not ink.
 - FR-K4 (P0). A page marker closes the current page and opens the next in the same notebook. An empty page is not created twice in a row.
-- FR-K5 (P0). Target notebook for capture is chosen before writing starts (last used by default). Changing it mid-capture applies from the next page.
+- FR-K5 (P0). Live page: the user assigns one page of a notebook as the live page (page menu, Set as live page). Pen ink goes to that page, the page shows a Live badge in the notebook, and tapping it opens the live view. Assigning is only possible while the pen is connected over Bluetooth. There is no separate Live page button. A pen page-button press moves the live page to the next page.
 - FR-K6 (P0). Checkpoint the open stroke every 500 ms and on app pause. Recover exactly once after a crash.
 - FR-K7 (P1). Capture needs the app in the foreground. The screen stays awake while Live Capture is open. If the app is backgrounded, the open stroke is saved and the link state shows Paused. No foreground service in this release.
 - FR-K8 (P1). Undo last stroke and redo while capturing. Undo only affects the app's copy and never touches paper.
@@ -181,7 +181,9 @@ Ink is captured, not drawn. The editor is for viewing and tidying.
 - FR-E4 (P1). Lasso select: choose strokes, then delete, recolor, or move them. Copy and paste are P2.
 - FR-E5 (P1). Ink display style: color and a width multiplier for a selection or the whole page. This changes rendering only. Raw stroke data is never altered.
 - FR-E6 (P1). Paper style per notebook: blank, dotted, lined, grid. Display and export only.
-- FR-E7 (P2). Minimap while zoomed.
+- FR-E7 (P1). Zoom: pages in the editor and the live view zoom with a two finger pinch, a trackpad pinch or Ctrl and the wheel, and Zoom in, Zoom out and Fit page buttons. The wheel and two finger drag pan while zoomed. One finger keeps drawing or moving strokes.
+- FR-E8 (P0). Moving a stroke keeps its shape: at the page edge the whole stroke stops, it is never flattened against the edge.
+- FR-E9 (P2). Minimap while zoomed.
 
 ### 6.7 Search and recognition
 

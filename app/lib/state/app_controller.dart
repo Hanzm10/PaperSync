@@ -402,9 +402,14 @@ class AppController extends Notifier<AppModel> {
     }
   }
 
-  void moveStroke(String pageId, String strokeId, Offset deltaMm) {
+  void moveStroke(String pageId, String strokeId, Offset requested) {
     final page = state.page(pageId);
     if (page == null) return;
+    // Points are clamped to the page one by one, so a stroke dragged past the
+    // edge would flatten against it. Limit the move instead, so the whole
+    // stroke stays rigid and stops at the edge.
+    final deltaMm = _limitMove(page, strokeId, requested);
+    if (deltaMm == Offset.zero) return;
     _replacePage(
       page.copyWith(
         strokes: [
@@ -422,6 +427,32 @@ class AppController extends Notifier<AppModel> {
       ),
     );
     _dirtyMoves[strokeId] = pageId;
+  }
+
+  Offset _limitMove(NotebookPage page, String strokeId, Offset requested) {
+    var minX = double.infinity;
+    var maxX = double.negativeInfinity;
+    var minY = double.infinity;
+    var maxY = double.negativeInfinity;
+    for (final stroke in page.strokes) {
+      if (stroke.id != strokeId) continue;
+      for (final point in stroke.points) {
+        if (point.xMm < minX) minX = point.xMm;
+        if (point.xMm > maxX) maxX = point.xMm;
+        if (point.yMm < minY) minY = point.yMm;
+        if (point.yMm > maxY) maxY = point.yMm;
+      }
+    }
+    if (minX > maxX) return Offset.zero;
+    double fit(double wanted, double low, double high) {
+      if (low > high) return 0;
+      return wanted.clamp(low, high).toDouble();
+    }
+
+    return Offset(
+      fit(requested.dx, -minX, pageWidthMm - maxX),
+      fit(requested.dy, -minY, pageHeightMm - maxY),
+    );
   }
 
   void grantPermission() {
@@ -455,7 +486,26 @@ class AppController extends Notifier<AppModel> {
     );
   }
 
-  void startLive(String notebookId, {bool phoneDrawing = false}) {
+  /// Makes [pageId] the live page: pen ink goes to it until [clearLivePage].
+  /// Only possible while the pen is connected. Returns false otherwise.
+  bool assignLivePage(String notebookId, String pageId) {
+    if (!_active || !state.link.connected) return false;
+    final notebook = state.notebook(notebookId);
+    if (notebook == null) return false;
+    if (!notebook.pages.any((page) => page.id == pageId)) return false;
+    startLive(notebookId, pageId: pageId);
+    return true;
+  }
+
+  /// Stops live capture. The page keeps its ink.
+  void clearLivePage() => stopLive();
+
+  /// Starts capture on [pageId], or on the newest page when it is null.
+  void startLive(
+    String notebookId, {
+    bool phoneDrawing = false,
+    String? pageId,
+  }) {
     stopLive();
     if (!_active) return;
     if (state.notebook(notebookId) == null) return;
@@ -463,9 +513,12 @@ class AppController extends Notifier<AppModel> {
       addPage(notebookId);
     }
     final notebook = state.notebook(notebookId)!;
-    final page = notebook.pages.reduce(
-      (a, b) => a.pageIndex > b.pageIndex ? a : b,
-    );
+    final chosen = pageId == null
+        ? null
+        : notebook.pages.where((page) => page.id == pageId).firstOrNull;
+    final page =
+        chosen ??
+        notebook.pages.reduce((a, b) => a.pageIndex > b.pageIndex ? a : b);
     _machine = CaptureMachine(strokesOnPage: page.strokes.length);
     _strokeOpen = false;
     _capturing = true;
@@ -582,12 +635,7 @@ class AppController extends Notifier<AppModel> {
       _apply(event);
     }
     if (_strokeOpen && state.phoneDrawing) _apply(const StrokeClosed());
-    if (state.hover != null) {
-      state = state.copyWith(hover: null);
-    }
-    if (state.phoneDrawing) {
-      state = state.copyWith(phoneDrawing: false);
-    }
+    state = state.copyWith(clearLive: true, hover: null, phoneDrawing: false);
   }
 
   Future<void> _grant() async {

@@ -10,6 +10,7 @@ import '../state/app_controller.dart';
 import '../theme/tokens.dart';
 import '../widgets/chrome.dart';
 import '../widgets/ink_page.dart';
+import '../widgets/zoomable_sheet.dart';
 
 class LiveCaptureScreen extends ConsumerStatefulWidget {
   const LiveCaptureScreen({
@@ -31,13 +32,27 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   AppController? _controller;
   int? _drawPointer;
 
+  /// True when this screen started capture itself (a draw-on-phone session).
+  /// A page the pen was assigned to keeps capturing after the screen closes.
+  bool _owns = false;
+
   @override
   void initState() {
     super.initState();
     _controller = ref.read(appControllerProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _controller?.startLive(
+      final controller = _controller;
+      if (controller == null) return;
+      final model = ref.read(appControllerProvider);
+      final alreadyLive =
+          model.livePageId != null && model.liveNotebookId == widget.notebookId;
+      if (alreadyLive) {
+        if (widget.startInPhoneDrawing) controller.setPhoneDrawing(true);
+        return;
+      }
+      _owns = true;
+      controller.startLive(
         widget.notebookId,
         phoneDrawing: widget.startInPhoneDrawing,
       );
@@ -47,11 +62,20 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   @override
   void dispose() {
     final controller = _controller;
+    final owns = _owns;
     super.dispose();
-    // stopLive updates app state. Doing that while this element is unmounting
+    // These update app state. Doing that while this element is unmounting
     // marks a defunct element dirty, so it runs after the route is gone.
     if (controller != null) {
-      unawaited(Future<void>.microtask(controller.stopLive));
+      unawaited(
+        Future<void>.microtask(() {
+          if (owns) {
+            controller.stopLive();
+          } else {
+            controller.setPhoneDrawing(false);
+          }
+        }),
+      );
     }
   }
 
@@ -200,10 +224,19 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                         width: fitted.width,
                         child: _PageSlide(
                           pageId: page.id,
-                          child: InkPage(
-                            strokes: page.strokes,
-                            hover: model.hover,
-                            onDraw: model.phoneDrawing ? _onDraw : null,
+                          child: AspectRatio(
+                            aspectRatio: pageAspect,
+                            child: ZoomableSheet(
+                              onPinchStart: () {
+                                _drawPointer = null;
+                                _controller?.drawEnd();
+                              },
+                              child: InkPage(
+                                strokes: page.strokes,
+                                hover: model.hover,
+                                onDraw: model.phoneDrawing ? _onDraw : null,
+                              ),
+                            ),
                           ),
                         ),
                       ),

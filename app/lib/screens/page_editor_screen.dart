@@ -11,6 +11,7 @@ import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/editor_bar.dart';
 import '../widgets/ink_page.dart';
+import '../widgets/zoomable_sheet.dart';
 
 class PageEditorScreen extends ConsumerStatefulWidget {
   const PageEditorScreen({
@@ -41,6 +42,7 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
       return const Scaffold(body: SizedBox.shrink());
     }
     final history = model.historyFor(page.id);
+    final isLive = model.livePageId == page.id;
 
     return Scaffold(
       appBar: AppTopBar(
@@ -50,6 +52,17 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
           tooltip: 'Page actions',
           onSelected: (value) => _onMenu(context, controller, page, value),
           itemBuilder: (context) => [
+            PopupMenuItem(
+              value: 'live',
+              enabled: isLive || model.link.connected,
+              child: Text(
+                isLive
+                    ? 'Stop live capture'
+                    : model.link.connected
+                    ? 'Set as live page'
+                    : 'Set as live page (connect a pen)',
+              ),
+            ),
             const PopupMenuItem(value: 'pdf', child: Text('Export PDF')),
             const PopupMenuItem(value: 'image', child: Text('Export image')),
             PopupMenuItem(
@@ -78,17 +91,22 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
                   return Center(
                     child: SizedBox(
                       width: fitted.width,
-                      child: InkPage(
-                        strokes: page.strokes,
-                        selectedStrokeId: _selectedId,
-                        onTapDown: (mm) => _tap(controller, page, mm),
-                        onPanStart: (mm) => _panStart(controller, page, mm),
-                        onPanUpdate: (mm, delta) =>
-                            _panUpdate(controller, page, mm, delta),
-                        onPanEnd: () {
-                          controller.disarmHistory();
-                          _lastErasedId = null;
-                        },
+                      child: AspectRatio(
+                        aspectRatio: pageAspect,
+                        child: ZoomableSheet(
+                          child: InkPage(
+                            strokes: page.strokes,
+                            selectedStrokeId: _selectedId,
+                            onTapDown: (mm) => _tap(controller, page, mm),
+                            onPanStart: (mm) => _panStart(controller, page, mm),
+                            onPanUpdate: (mm, delta) =>
+                                _panUpdate(controller, page, mm, delta),
+                            onPanEnd: () {
+                              controller.disarmHistory();
+                              _lastErasedId = null;
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   );
@@ -182,6 +200,15 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
     String value,
   ) async {
     switch (value) {
+      case 'live':
+        if (ref.read(appControllerProvider).livePageId == page.id) {
+          controller.clearLivePage();
+        } else if (!controller.assignLivePage(widget.notebookId, page.id) &&
+            context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Connect a pen to make a page live.')),
+          );
+        }
       case 'pdf':
         await exportPage(context, page, asPdf: true);
       case 'image':

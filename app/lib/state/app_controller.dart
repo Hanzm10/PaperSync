@@ -35,6 +35,7 @@ class AppModel {
     required this.livePageId,
     required this.hover,
     required this.history,
+    this.phoneDrawing = false,
   });
 
   final List<Notebook> notebooks;
@@ -44,6 +45,10 @@ class AppModel {
   final String? livePageId;
   final StrokePoint? hover;
   final Map<String, PageHistory> history;
+
+  /// True while the user draws on the phone screen. The default is false:
+  /// the notebook mode, where ink comes from the pen.
+  final bool phoneDrawing;
 
   static const _unset = Object();
 
@@ -97,6 +102,7 @@ class AppModel {
     String? livePageId,
     Object? hover = _unset,
     Map<String, PageHistory>? history,
+    bool? phoneDrawing,
     bool clearLive = false,
   }) {
     return AppModel(
@@ -109,6 +115,7 @@ class AppModel {
       livePageId: clearLive ? null : (livePageId ?? this.livePageId),
       hover: hover == _unset ? this.hover : hover as StrokePoint?,
       history: history ?? this.history,
+      phoneDrawing: phoneDrawing ?? this.phoneDrawing,
     );
   }
 }
@@ -126,6 +133,8 @@ class AppController extends Notifier<AppModel> {
   final ValueNotifier<DebugInkStats> debugStats = ValueNotifier<DebugInkStats>(
     DebugInkStats.empty,
   );
+
+  static const double _phonePressure = 0.55;
 
   bool _active = true;
   int _epoch = 0;
@@ -446,7 +455,7 @@ class AppController extends Notifier<AppModel> {
     );
   }
 
-  void startLive(String notebookId) {
+  void startLive(String notebookId, {bool phoneDrawing = false}) {
     stopLive();
     if (!_active) return;
     if (state.notebook(notebookId) == null) return;
@@ -464,11 +473,103 @@ class AppController extends Notifier<AppModel> {
       liveNotebookId: notebookId,
       livePageId: page.id,
       hover: null,
+      phoneDrawing: phoneDrawing,
     );
     final transport = _transport;
+    if (transport is SimulatedPenTransport &&
+        state.link.connected &&
+        !phoneDrawing) {
+      transport.play();
+    }
+  }
+
+  /// Switches between the notebook mode (ink from the pen, the default) and
+  /// drawing on the phone screen.
+  ///
+  /// While drawing on the phone, pen samples are ignored so two sources never
+  /// write the same stroke.
+  void setPhoneDrawing(bool on) {
+    if (!_active || !_capturing || state.phoneDrawing == on) return;
+    final transport = _transport;
+    if (on) {
+      for (final event in _machine.disconnect()) {
+        _apply(event);
+      }
+      if (transport is SimulatedPenTransport) transport.stop();
+      state = state.copyWith(phoneDrawing: true, hover: null);
+      return;
+    }
+    drawEnd();
+    state = state.copyWith(phoneDrawing: false);
+    _resetMachine();
     if (transport is SimulatedPenTransport && state.link.connected) {
       transport.play();
     }
+  }
+
+  /// A finger or stylus went down on the page. [pressure] is 0 to 1.
+  void drawStart(Offset mm, {double pressure = _phonePressure}) {
+    if (!_capturing || !state.phoneDrawing || _strokeOpen) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null || page.strokes.length >= maxStrokesPerPage) return;
+    _apply(StrokeOpened(_phonePoint(mm, pressure)));
+  }
+
+  void drawMove(Offset mm, {double pressure = _phonePressure}) {
+    if (!_capturing || !state.phoneDrawing || !_strokeOpen) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null || page.strokes.isEmpty) return;
+    if (page.strokes.last.points.length >= maxPointsPerStroke) {
+      _apply(const StrokeClosed());
+      drawStart(mm, pressure: pressure);
+      return;
+    }
+    _apply(PointAdded(_phonePoint(mm, pressure)));
+  }
+
+  void drawEnd() {
+    if (!_strokeOpen || !state.phoneDrawing) return;
+    _apply(const StrokeClosed());
+  }
+
+  /// Removes the newest stroke on the live page. Editor undo brings it back.
+  void eraseLastStroke() {
+    if (_strokeOpen) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null) return;
+    for (var i = page.strokes.length - 1; i >= 0; i--) {
+      if (page.strokes[i].deletedAt == null) {
+        eraseStroke(page.id, page.strokes[i].id);
+        return;
+      }
+    }
+  }
+
+  /// Starts the next page of the live notebook, as the pen's page button does.
+  void newLivePage() {
+    if (!_capturing) return;
+    if (_strokeOpen && state.phoneDrawing) drawEnd();
+    _turnLivePage();
+    _resetMachine();
+  }
+
+  void _resetMachine() {
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    _machine = CaptureMachine(strokesOnPage: page?.strokes.length ?? 0);
+  }
+
+  StrokePoint _phonePoint(Offset mm, double pressure) {
+    return StrokePoint(
+      xMm: mm.dx,
+      yMm: mm.dy,
+      pressure: (pressure.clamp(0.0, 1.0) * 16383).round(),
+      touching: true,
+      tMs: _clock().millisecondsSinceEpoch,
+    );
   }
 
   void stopLive() {
@@ -480,8 +581,12 @@ class AppController extends Notifier<AppModel> {
     for (final event in _machine.disconnect()) {
       _apply(event);
     }
+    if (_strokeOpen && state.phoneDrawing) _apply(const StrokeClosed());
     if (state.hover != null) {
       state = state.copyWith(hover: null);
+    }
+    if (state.phoneDrawing) {
+      state = state.copyWith(phoneDrawing: false);
     }
   }
 
@@ -517,7 +622,7 @@ class AppController extends Notifier<AppModel> {
   }
 
   void _onBytes(Uint8List bytes) {
-    if (!_capturing || !_active) return;
+    if (!_capturing || !_active || state.phoneDrawing) return;
     final arrival = _clock();
     final result = decode(bytes);
     final sampleCount = switch (result) {

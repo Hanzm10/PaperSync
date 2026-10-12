@@ -16,6 +16,7 @@ class InkPage extends StatelessWidget {
     this.onPanStart,
     this.onPanUpdate,
     this.onPanEnd,
+    this.onDraw,
   });
 
   final List<Stroke> strokes;
@@ -26,6 +27,11 @@ class InkPage extends StatelessWidget {
   final void Function(Offset mm)? onPanStart;
   final void Function(Offset mm, Offset deltaMm)? onPanUpdate;
   final VoidCallback? onPanEnd;
+
+  /// Raw pointer events on the sheet, with the position in millimetres.
+  /// Unlike the pan callbacks this has no touch slop, so a stroke starts
+  /// where the finger lands.
+  final void Function(PointerEvent event, Offset mm)? onDraw;
 
   bool get _interactive =>
       onTapDown != null || onPanStart != null || onPanUpdate != null;
@@ -52,6 +58,30 @@ class InkPage extends StatelessWidget {
         child: CustomPaint(painter: painter, child: const SizedBox.expand()),
       ),
     );
+
+    if (onDraw != null) {
+      return AspectRatio(
+        aspectRatio: pageAspect,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final size = constraints.biggest;
+            void forward(PointerEvent event) {
+              if (size.width == 0 || size.height == 0) return;
+              onDraw!(event, mmFromLocal(event.localPosition, size));
+            }
+
+            return Listener(
+              behavior: HitTestBehavior.opaque,
+              onPointerDown: forward,
+              onPointerMove: forward,
+              onPointerUp: forward,
+              onPointerCancel: forward,
+              child: sheet,
+            );
+          },
+        ),
+      );
+    }
 
     return AspectRatio(
       aspectRatio: pageAspect,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -11,9 +12,16 @@ import '../widgets/chrome.dart';
 import '../widgets/ink_page.dart';
 
 class LiveCaptureScreen extends ConsumerStatefulWidget {
-  const LiveCaptureScreen({super.key, required this.notebookId});
+  const LiveCaptureScreen({
+    super.key,
+    required this.notebookId,
+    this.startInPhoneDrawing = false,
+  });
 
   final String notebookId;
+
+  /// Opens in the draw-on-phone mode. The default is the notebook mode.
+  final bool startInPhoneDrawing;
 
   @override
   ConsumerState<LiveCaptureScreen> createState() => _LiveCaptureScreenState();
@@ -21,6 +29,7 @@ class LiveCaptureScreen extends ConsumerStatefulWidget {
 
 class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   AppController? _controller;
+  int? _drawPointer;
 
   @override
   void initState() {
@@ -28,7 +37,10 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
     _controller = ref.read(appControllerProvider.notifier);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _controller?.startLive(widget.notebookId);
+      _controller?.startLive(
+        widget.notebookId,
+        phoneDrawing: widget.startInPhoneDrawing,
+      );
     });
   }
 
@@ -100,6 +112,62 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                 ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: PaperTokens.space24,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<bool>(
+                  key: const Key('draw-mode-toggle'),
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    minimumSize: WidgetStatePropertyAll(
+                      Size(0, PaperTokens.minTap),
+                    ),
+                  ),
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Notebook')),
+                    ButtonSegment(value: true, label: Text('Draw on phone')),
+                  ],
+                  selected: {model.phoneDrawing},
+                  onSelectionChanged: (selection) {
+                    _drawPointer = null;
+                    _controller?.setPhoneDrawing(selection.first);
+                  },
+                ),
+              ),
+            ),
+            if (model.phoneDrawing)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  PaperTokens.space24,
+                  PaperTokens.space8,
+                  PaperTokens.space12,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Drawing on this phone. The pen is paused.',
+                        key: const Key('draw-mode-note'),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                    BarAction(
+                      label: 'Undo stroke',
+                      glyph: PaperGlyph.undo,
+                      onPressed: () => _controller?.eraseLastStroke(),
+                    ),
+                    BarAction(
+                      label: 'New page',
+                      glyph: PaperGlyph.plus,
+                      onPressed: () => _controller?.newLivePage(),
+                    ),
+                  ],
+                ),
+              ),
             const SizedBox(height: PaperTokens.space12),
             if (page.markers.isNotEmpty)
               Padding(
@@ -135,6 +203,7 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                           child: InkPage(
                             strokes: page.strokes,
                             hover: model.hover,
+                            onDraw: model.phoneDrawing ? _onDraw : null,
                           ),
                         ),
                       ),
@@ -148,6 +217,37 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
       ),
     );
   }
+}
+
+extension on _LiveCaptureScreenState {
+  void _onDraw(PointerEvent event, Offset mm) {
+    final controller = _controller;
+    if (controller == null) return;
+    final pressure = _pressureOf(event);
+    if (event is PointerDownEvent) {
+      if (_drawPointer != null) return;
+      _drawPointer = event.pointer;
+      controller.drawStart(mm, pressure: pressure);
+    } else if (event is PointerMoveEvent) {
+      if (event.pointer != _drawPointer) return;
+      controller.drawMove(mm, pressure: pressure);
+    } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      if (event.pointer != _drawPointer) return;
+      _drawPointer = null;
+      controller.drawEnd();
+    }
+  }
+}
+
+/// A stylus reports real pressure. A finger does not, so it gets a steady
+/// medium line.
+double _pressureOf(PointerEvent event) {
+  final stylus =
+      event.kind == PointerDeviceKind.stylus ||
+      event.kind == PointerDeviceKind.invertedStylus;
+  final range = event.pressureMax - event.pressureMin;
+  if (!stylus || range <= 0) return 0.55;
+  return ((event.pressure - event.pressureMin) / range).clamp(0.05, 1.0);
 }
 
 Size _fitSheet(BoxConstraints constraints) {

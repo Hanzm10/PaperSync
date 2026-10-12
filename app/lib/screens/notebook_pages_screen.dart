@@ -93,6 +93,31 @@ class NotebookPagesScreen extends ConsumerWidget {
               ),
             ),
           ),
+          if (!connected)
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(
+                PaperTokens.space24,
+                0,
+                PaperTokens.space24,
+                PaperTokens.space16,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: SecondaryButton(
+                  key: const Key('draw-on-phone-button'),
+                  label: 'Draw on phone',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => LiveCaptureScreen(
+                          notebookId: notebookId,
+                          startInPhoneDrawing: true,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(
               PaperTokens.space24,

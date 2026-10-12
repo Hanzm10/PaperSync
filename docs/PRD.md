@@ -159,6 +159,7 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 - FR-K7 (P1). Capture needs the app in the foreground. The screen stays awake while Live Capture is open. If the app is backgrounded, the open stroke is saved and the link state shows Paused. No foreground service in this release.
 - FR-K8 (P1). Undo last stroke and redo while capturing. Undo only affects the app's copy and never touches paper.
 - FR-K9 (P2). Zoom and pan the capture canvas with a minimap.
+- FR-K10 (P1). Draw on phone: Live Capture has a Notebook / Draw on phone switch. Notebook is the default and the only mode that takes pen ink. Draw on phone lets a finger or stylus draw strokes on the page, with New page and Undo stroke. The pen is paused while it is on, and the app always starts in Notebook mode. Without a connected pen the notebook screen offers Draw on phone directly.
 
 ### 6.5 Library and notebooks
 

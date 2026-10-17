@@ -103,6 +103,8 @@ class UsbPenTransport implements PenTransport {
           'dropped $droppedReports, packets $_packetsSent',
       'Reader: ${text('readMode')}, claimed ${text('claimed')}, '
           'empty ${text('emptyReads')}, last result ${text('lastResult')}',
+      if ('${native['lastError'] ?? ''}'.isNotEmpty)
+        'Reader error: ${native['lastError']}',
       if (interfaces is List) 'Interfaces: ${interfaces.join(' | ')}',
     ];
   }

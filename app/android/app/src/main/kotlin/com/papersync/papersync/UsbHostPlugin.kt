@@ -86,6 +86,9 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
     @Volatile
     private var readMode = "none"
 
+    @Volatile
+    private var lastError = ""
+
     private var interfaceSummary: List<String> = emptyList()
     private var receiverRegistered = false
 
@@ -186,6 +189,7 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
             "emptyReads" to emptyReads.get(),
             "lastResult" to lastResult,
             "readMode" to readMode,
+            "lastError" to lastError,
             "perEndpoint" to endpoints,
             "interfaces" to interfaceSummary,
         )
@@ -326,6 +330,7 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
         perEndpoint.clear()
         lastResult = 0
         readMode = "none"
+        lastError = ""
         reading = true
         val name = device.deviceName
         val claimed = links.toList()
@@ -358,7 +363,12 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
 
     private fun startThread(tag: String, name: String, body: () -> Unit) {
         val thread = Thread {
-            body()
+            try {
+                body()
+            } catch (e: Throwable) {
+                // An uncaught error on this thread would end the whole app.
+                lastError = e.javaClass.simpleName + ": " + (e.message ?: "")
+            }
             if (reading) {
                 // The device went away without being closed.
                 mainHandler.post {

@@ -10,9 +10,11 @@ import '../ble/permissions.dart';
 import '../ble/simulated_pen_transport.dart';
 import '../capture/capture_machine.dart';
 import '../capture/markers.dart';
+import '../capture/tablet_turn.dart';
 import '../data/sample_notebooks.dart';
 import '../models/ink_models.dart';
 import '../models/pen_link.dart';
+import '../platform/usb_pen_transport.dart';
 import '../protocol/codec.dart';
 import '../storage/checkpoint_scheduler.dart';
 import '../storage/notebook_store.dart';
@@ -489,6 +491,14 @@ class AppController extends Notifier<AppModel> {
     );
   }
 
+  /// Lines for the on-screen USB check, or null when the cable is not the
+  /// connection in use.
+  Future<List<String>?> usbDiagnostics() async {
+    final transport = _transport;
+    if (transport is! UsbPenTransport) return null;
+    return transport.diagnostics();
+  }
+
   /// Makes [pageId] the live page until [clearLivePage].
   ///
   /// By default the pen writes into it, which needs a connected pen. With
@@ -692,7 +702,15 @@ class AppController extends Notifier<AppModel> {
   void _onBytes(Uint8List bytes) {
     if (!_capturing || !_active || state.phoneDrawing) return;
     final arrival = _clock();
-    final result = decode(bytes);
+    var result = decode(bytes);
+    if (result is Decoded) {
+      // Positions arrive in the tablet's own frame. Turn them onto the
+      // portrait page before capture sees them.
+      result = Decoded(
+        turnNotification(result.notification, ref.read(tabletTurnProvider)),
+        droppedBytes: result.droppedBytes,
+      );
+    }
     final sampleCount = switch (result) {
       Decoded(:final notification) => notification.samples.length,
       Rejected() => 0,

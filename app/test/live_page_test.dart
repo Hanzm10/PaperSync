@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:papersync/ble/simulated_pen_transport.dart';
+import 'package:papersync/domain/ink.dart';
 import 'package:papersync/models/ink_models.dart';
 import 'package:papersync/models/pen_link.dart';
 import 'package:papersync/screens/live_capture_screen.dart';
@@ -162,7 +163,7 @@ void main() {
       final maxX = right.points
           .map((p) => p.xMm)
           .reduce((a, b) => a > b ? a : b);
-      expect(maxX, closeTo(170, 1e-9));
+      expect(maxX, closeTo(pageWidthMm, 1e-9));
     });
   });
 

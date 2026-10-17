@@ -7,9 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ink_models.dart';
 import '../state/app_controller.dart';
+import '../state/connection_mode.dart';
+import '../state/pen_transport_provider.dart';
 import '../theme/tokens.dart';
 import '../widgets/chrome.dart';
 import '../widgets/ink_page.dart';
+import '../widgets/status_indicators.dart';
+import '../widgets/usb_check.dart';
 import '../widgets/zoomable_sheet.dart';
 
 class LiveCaptureScreen extends ConsumerStatefulWidget {
@@ -128,6 +132,11 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                 ),
               ),
             ),
+            StatusLine(link: model.link),
+            if (ref.watch(usbSupportedProvider) &&
+                ref.watch(connectionModeProvider) == ConnectionMode.usb)
+              const UsbCheck(compact: true),
+            const SizedBox(height: PaperTokens.space8),
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: PaperTokens.space24,

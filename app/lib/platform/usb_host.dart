@@ -64,6 +64,9 @@ abstract interface class UsbHost {
 
   Future<void> close();
 
+  /// What the native reader has seen, for the on-screen USB check.
+  Future<Map<String, Object?>> stats();
+
   /// Raw interrupt IN transfers from the open device, one per event.
   Stream<Uint8List> get reports;
 
@@ -128,6 +131,12 @@ class MethodChannelUsbHost implements UsbHost {
   }
 
   @override
+  Future<Map<String, Object?>> stats() async {
+    final raw = await _channel.invokeMapMethod<String, Object?>('stats');
+    return raw ?? const <String, Object?>{};
+  }
+
+  @override
   Stream<Uint8List> get reports {
     return _reportChannel
         .receiveBroadcastStream()
@@ -135,17 +144,21 @@ class MethodChannelUsbHost implements UsbHost {
         .cast<Uint8List>();
   }
 
+  // One stream for everyone. Each call to receiveBroadcastStream would listen
+  // on its own, and the native side keeps only the last listener.
+  late final Stream<UsbHostEvent> _events = _eventChannel
+      .receiveBroadcastStream()
+      .map((event) {
+        if (event is Map<Object?, Object?>) {
+          final type = event['type'] == 'attached'
+              ? UsbHostEventType.attached
+              : UsbHostEventType.detached;
+          final name = event['name'];
+          return UsbHostEvent(type, name is String ? name : null);
+        }
+        return const UsbHostEvent(UsbHostEventType.detached, null);
+      });
+
   @override
-  Stream<UsbHostEvent> get events {
-    return _eventChannel.receiveBroadcastStream().map((event) {
-      if (event is Map<Object?, Object?>) {
-        final type = event['type'] == 'attached'
-            ? UsbHostEventType.attached
-            : UsbHostEventType.detached;
-        final name = event['name'];
-        return UsbHostEvent(type, name is String ? name : null);
-      }
-      return const UsbHostEvent(UsbHostEventType.detached, null);
-    });
-  }
+  Stream<UsbHostEvent> get events => _events;
 }

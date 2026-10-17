@@ -60,6 +60,21 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
     @Volatile
     private var reading = false
 
+    // What the reader thread has seen, for the on-screen USB check.
+    @Volatile
+    private var transferCount = 0L
+
+    @Volatile
+    private var emptyReads = 0L
+
+    @Volatile
+    private var lastResult = 0
+
+    private var claimedInterfaceId = -1
+    private var claimedEndpointAddress = -1
+    private var claimedMaxPacket = 0
+    private var interfaceSummary: List<String> = emptyList()
+
     private var receiverRegistered = false
 
     private val receiver = object : BroadcastReceiver() {
@@ -138,12 +153,39 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
             "devices" -> result.success(listDevices())
             "requestPermission" -> requestPermission(call.argument<String>("name"), result)
             "open" -> open(call.argument<String>("name"), result)
+            "stats" -> result.success(stats())
             "close" -> {
                 closeLink()
                 result.success(null)
             }
             else -> result.notImplemented()
         }
+    }
+
+    private fun stats(): Map<String, Any> {
+        return mapOf(
+            "open" to (connection != null),
+            "reading" to reading,
+            "interfaceId" to claimedInterfaceId,
+            "endpoint" to claimedEndpointAddress,
+            "maxPacket" to claimedMaxPacket,
+            "transfers" to transferCount,
+            "emptyReads" to emptyReads,
+            "lastResult" to lastResult,
+            "interfaces" to interfaceSummary,
+        )
+    }
+
+    private fun describeInterfaces(device: UsbDevice): List<String> {
+        val lines = mutableListOf<String>()
+        for (i in 0 until device.interfaceCount) {
+            val iface = device.getInterface(i)
+            val endpoints = (0 until iface.endpointCount).joinToString(",") { j ->
+                "0x" + iface.getEndpoint(j).address.toString(16)
+            }
+            lines.add("id " + iface.id + " class " + iface.interfaceClass + " eps " + endpoints)
+        }
+        return lines
     }
 
     private fun listDevices(): List<Map<String, Any>> {
@@ -192,6 +234,10 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
         }
         val iface = found.first
         val endpoint = found.second
+        interfaceSummary = describeInterfaces(device)
+        claimedInterfaceId = iface.id
+        claimedEndpointAddress = endpoint.address
+        claimedMaxPacket = endpoint.maxPacketSize
         val conn = usbManager.openDevice(device)
         if (conn == null) {
             result.error("open_failed", "Android would not open the tablet", null)
@@ -239,17 +285,23 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
     }
 
     private fun startReader(conn: UsbDeviceConnection, endpoint: UsbEndpoint, name: String) {
+        transferCount = 0L
+        emptyReads = 0L
+        lastResult = 0
         reading = true
         val size = maxOf(endpoint.maxPacketSize, MIN_BUFFER)
         val thread = Thread {
             val buffer = ByteArray(size)
             while (reading) {
                 val count = conn.bulkTransfer(endpoint, buffer, buffer.size, READ_TIMEOUT_MS)
+                lastResult = count
                 if (count > 0) {
+                    transferCount += 1
                     val copy = buffer.copyOf(count)
                     mainHandler.post { reportSink?.success(copy) }
-                } else if (!usbManager.deviceList.containsKey(name)) {
-                    break
+                } else {
+                    emptyReads += 1
+                    if (!usbManager.deviceList.containsKey(name)) break
                 }
             }
             if (reading) {

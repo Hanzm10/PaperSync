@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/app_controller.dart';
+import '../domain/ink.dart';
 import '../state/cloud.dart';
 import '../state/connection_mode.dart';
 import '../state/pen_transport_provider.dart';
@@ -26,6 +27,8 @@ class SettingsScreen extends ConsumerWidget {
     final link = ref.watch(appControllerProvider).link;
     final status = ref.watch(syncStatusProvider);
     final usbSupported = ref.watch(usbSupportedProvider);
+    final simulated = ref.watch(useSimulatorProvider);
+    final turn = ref.watch(tabletTurnProvider);
     final mode = ref.watch(connectionModeProvider);
     final signedIn = ref.watch(paperSyncAuthProvider).current != null;
     final email = prefs.email.trim();
@@ -84,6 +87,23 @@ class SettingsScreen extends ConsumerWidget {
                   );
                 },
               ),
+              if (!simulated)
+                SettingsTile(
+                  key: const Key('tablet-turn-tile'),
+                  title: 'Tablet orientation',
+                  subtitle:
+                      'Which way the tablet is turned for a portrait page',
+                  trailing: Text(
+                    turn.label,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  onPressed: () {
+                    final next = turn == TabletTurn.right
+                        ? TabletTurn.left
+                        : TabletTurn.right;
+                    ref.read(tabletTurnProvider.notifier).select(next);
+                  },
+                ),
               if (usbSupported)
                 SettingsTile(
                   key: const Key('connection-mode-tile'),

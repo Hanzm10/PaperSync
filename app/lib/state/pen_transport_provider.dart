@@ -9,8 +9,10 @@ import '../ble/simulated_pen_transport.dart';
 import '../platform/transport_factory_web.dart'
     if (dart.library.io) '../platform/transport_factory_io.dart'
     as platform;
+import '../domain/ink.dart';
 import 'connection_mode.dart';
 import 'flutter_test_env.dart';
+import 'tablet_turn_store.dart';
 import 'transport_choice.dart';
 
 /// Debug phones can opt into the simulator with
@@ -73,6 +75,40 @@ class ConnectionModeController extends Notifier<ConnectionMode> {
     if (mode == state) return;
     state = mode;
     unawaited(ref.read(connectionModeStoreProvider).write(mode));
+  }
+}
+
+final tabletTurnStoreProvider = Provider<TabletTurnStore>((ref) {
+  return platform.createTabletTurnStore();
+});
+
+final tabletTurnProvider = NotifierProvider<TabletTurnController, TabletTurn>(
+  TabletTurnController.new,
+);
+
+/// Which way the tablet is turned to make the page portrait. Turned right
+/// until the user says otherwise.
+class TabletTurnController extends Notifier<TabletTurn> {
+  bool _alive = true;
+
+  @override
+  TabletTurn build() {
+    _alive = true;
+    ref.onDispose(() => _alive = false);
+    if (!ref.watch(useSimulatorProvider)) unawaited(_load());
+    return TabletTurn.right;
+  }
+
+  Future<void> _load() async {
+    final saved = await ref.read(tabletTurnStoreProvider).read();
+    if (!_alive || saved == null || saved == state) return;
+    state = saved;
+  }
+
+  void select(TabletTurn turn) {
+    if (turn == state) return;
+    state = turn;
+    unawaited(ref.read(tabletTurnStoreProvider).write(turn));
   }
 }
 

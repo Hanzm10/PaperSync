@@ -160,7 +160,7 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 
 ### 6.4 Capture
 
-- FR-K1 (P0). Live Capture shows the page being written on a canvas with the tablet's 170 by 107 mm shape, and a pill that reads Live Capture with link state.
+- FR-K1 (P0). Live Capture shows the page being written on a portrait canvas, 107 mm across and 170 mm tall: the 170 by 107 mm tablet turned to portrait, because the notebook it sits under is portrait. The whole tablet area lands exactly on the canvas, so the pen can never write outside it. A pill shows the link state.
 - FR-K2 (P0). Strokes render within one frame of arrival. Pressure drives line width.
 - FR-K3 (P0). Hover shows a small cursor dot, not ink.
 - FR-K4 (P0). A page marker closes the current page and opens the next in the same notebook. An empty page is not created twice in a row.
@@ -170,6 +170,8 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 - FR-K8 (P1). Undo last stroke and redo while capturing. Undo only affects the app's copy and never touches paper.
 - FR-K9 (P2). Zoom and pan the capture canvas with a minimap.
 - FR-K10 (P1). Draw on phone is part of the live page, not a separate screen. A page is assigned from its menu: Set as live page (the pen writes into it, needs a connected pen, the default) or Draw on this page (a finger or stylus draws on it, no pen needed). The live view has a Notebook / Draw on phone switch to change the source, with Undo stroke while drawing. The pen is paused while drawing on the phone. Closing the live view ends a page that was assigned for drawing on the phone, so the pen is never left paused by accident. A page assigned to the pen keeps capturing with the pen back in charge. The badge on the page reads Live for the pen and Drawing for the phone.
+- FR-K11 (P0). Tablet orientation: Settings has a Tablet orientation row, Turned right (default) or Turned left, which says which way the tablet is turned to make the page portrait. Turned right puts the tablet's top left corner at the page's top right. Turned left puts it at the page's bottom left. It applies to the pen on either connection, and a wrong choice shows up as writing that runs sideways or upside down, so it is one tap to flip. It is remembered.
+- FR-K12 (P1). USB check: in USB mode, the Pen screen and Live Capture show a short readout of the cable link (transfers received, pen reports, other report ids, the last transfer in hex, the interfaces the phone sees, which one was claimed). It exists so a problem with the tablet can be read off the screen.
 
 ### 6.5 Library and notebooks
 
@@ -347,7 +349,7 @@ Still pending:
 
 - Whether Android needs the SET_IDLE that Windows sends to each HID interface.
 
-Mapping to millimetres: `xMm = x / 32759 * 170` and `yMm = y / 32759 * 107`. Do not use the physical size in the descriptor, which does not match the marketed area.
+Mapping to millimetres: `xMm = x / 32759 * 170` and `yMm = y / 32759 * 107`, in the tablet's own frame. The app then turns that frame onto the portrait page (FR-K11). Do not use the physical size in the descriptor, which does not match the marketed area.
 
 ### 8.3 Data model changes
 

@@ -56,6 +56,17 @@ class FakeUsbHost implements UsbHost {
   }
 
   @override
+  Future<Map<String, Object?>> stats() async => {
+    'transfers': 3,
+    'emptyReads': 1,
+    'lastResult': 10,
+    'interfaceId': 1,
+    'endpoint': 132,
+    'maxPacket': 64,
+    'interfaces': ['id 0 class 8 eps 0x2,0x83', 'id 1 class 3 eps 0x84'],
+  };
+
+  @override
   Stream<Uint8List> get reports => reportController.stream;
 
   @override

@@ -85,7 +85,10 @@ void main() {
       MaterialApp(
         theme: AppTheme.light(),
         home: Scaffold(
-          body: PageRow(page: page, onTap: () {}),
+          body: SizedBox(
+            width: 180,
+            child: PageRow(page: page, onTap: () {}),
+          ),
         ),
       ),
     );
@@ -99,6 +102,11 @@ void main() {
   testWidgets('library opens a notebook, the editor, and search', (
     tester,
   ) async {
+    // Pages are portrait now, so give the test a tall screen to fit the grid.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const ProviderScope(child: PaperSyncApp()));
     await _enterLibrary(tester);
 

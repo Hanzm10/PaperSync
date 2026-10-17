@@ -52,6 +52,41 @@ class UsbPenTransport implements PenTransport {
   /// share the interface, or anything malformed.
   int droppedReports = 0;
 
+  int _transfers = 0;
+  int _penReports = 0;
+  int _packetsSent = 0;
+  final Map<int, int> _otherIds = {};
+  String _lastHex = '';
+  bool _linked = false;
+
+  /// A readable snapshot of the USB link for the on-screen check. It joins
+  /// what Dart has received with what the native reader reports.
+  Future<List<String>> diagnostics() async {
+    Map<String, Object?> native = const {};
+    try {
+      native = await host.stats();
+    } on Object {
+      // The native side is not there, which the lines below make plain.
+    }
+    String text(String key) => '${native[key] ?? '?'}';
+    final interfaces = native['interfaces'];
+    final others = _otherIds.entries
+        .map((e) => '0x${e.key.toRadixString(16)} x${e.value}')
+        .join(', ');
+    return [
+      'USB: ${_linked ? 'connected' : 'not connected'}, '
+          '$_transfers transfers, $_penReports pen reports',
+      'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
+      'Other reports: ${others.isEmpty ? 'none' : others}, '
+          'dropped $droppedReports, packets $_packetsSent',
+      'Reader: transfers ${text('transfers')}, empty ${text('emptyReads')}, '
+          'last result ${text('lastResult')}',
+      'Claimed: interface ${text('interfaceId')}, '
+          'endpoint ${text('endpoint')}, max packet ${text('maxPacket')}',
+      if (interfaces is List) 'Interfaces: ${interfaces.join(' | ')}',
+    ];
+  }
+
   static int Function() _stopwatchClock() {
     final watch = Stopwatch()..start();
     return () => watch.elapsedMilliseconds;
@@ -139,6 +174,13 @@ class UsbPenTransport implements PenTransport {
       profile: profile,
       bootId: bootId ?? Random().nextInt(0x10000),
     );
+    _transfers = 0;
+    _penReports = 0;
+    _packetsSent = 0;
+    droppedReports = 0;
+    _otherIds.clear();
+    _lastHex = '';
+    _linked = true;
     _reportSub = host.reports.listen(_onReport, onError: (Object _) {});
     _emit(const Connected(mtu: 0, rssi: 0));
   }
@@ -182,12 +224,21 @@ class UsbPenTransport implements PenTransport {
   void _onReport(Uint8List bytes) {
     final packetizer = _packetizer;
     if (packetizer == null || _disposed) return;
+    _transfers += 1;
+    _lastHex = [
+      for (final b in bytes.take(12)) b.toRadixString(16).padLeft(2, '0'),
+    ].join(' ');
     final report = parsePenReport(bytes);
     if (report == null) {
       droppedReports += 1;
+      if (bytes.isNotEmpty) {
+        _otherIds[bytes[0]] = (_otherIds[bytes[0]] ?? 0) + 1;
+      }
       return;
     }
+    _penReports += 1;
     for (final packet in packetizer.add(report, _nowMs())) {
+      _packetsSent += 1;
       _notifications.add(packet);
     }
     if (packetizer.hasPending && _flushTimer == null) {
@@ -198,7 +249,10 @@ class UsbPenTransport implements PenTransport {
   void _flushNow() {
     _flushTimer = null;
     final packet = _packetizer?.flush();
-    if (packet != null && !_disposed) _notifications.add(packet);
+    if (packet != null && !_disposed) {
+      _packetsSent += 1;
+      _notifications.add(packet);
+    }
   }
 
   void _onHostEvent(UsbHostEvent event) {
@@ -234,6 +288,7 @@ class UsbPenTransport implements PenTransport {
   }
 
   Future<void> _closeLink() async {
+    _linked = false;
     _flushTimer?.cancel();
     _flushTimer = null;
     final packet = _packetizer?.flush();

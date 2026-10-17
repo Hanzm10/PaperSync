@@ -15,6 +15,7 @@ import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/paper_svg.dart';
+import '../widgets/usb_check.dart';
 import 'sign_in_screen.dart';
 
 class DeviceScreen extends ConsumerStatefulWidget {
@@ -54,6 +55,7 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
       ),
       body: link.bonded
           ? _Bonded(
+              usb: usb,
               link: link,
               colors: colors,
               detailsOpen: _detailsOpen,
@@ -124,6 +126,7 @@ class _BackupAction extends StatelessWidget {
 
 class _Bonded extends StatelessWidget {
   const _Bonded({
+    required this.usb,
     required this.link,
     required this.colors,
     required this.detailsOpen,
@@ -136,6 +139,7 @@ class _Bonded extends StatelessWidget {
     required this.onBackup,
   });
 
+  final bool usb;
   final PenLink link;
   final AppColors colors;
   final bool detailsOpen;
@@ -250,6 +254,7 @@ class _Bonded extends StatelessWidget {
             ),
           ),
         ),
+        if (usb) const UsbCheck(),
       ],
     );
   }
@@ -354,6 +359,7 @@ class _Pairing extends StatelessWidget {
               onPressed: () => onPick(nearby.first),
             ),
         ],
+        if (usb) const UsbCheck(),
       ],
     );
   }

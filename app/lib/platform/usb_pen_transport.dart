@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import '../ble/link_status.dart';
 import '../ble/pen_transport.dart';
+import '../usb/hid_descriptor.dart';
 import '../usb/hid_report.dart';
 import '../usb/tablet_profile.dart';
 import '../usb/usb_packetizer.dart';
@@ -14,6 +15,12 @@ import 'usb_host.dart';
 /// The tablet is plugged straight into the phone. This reads its raw pen
 /// reports and turns them into the same notification bytes the Bluetooth path
 /// delivers, so nothing downstream changes. There is no battery on this path.
+///
+/// The native side reads every HID interface of the tablet, and the tablet
+/// does not send the pen on the same one to every host. Report ID 9 is the
+/// one to use when it arrives. Any other pen report is read with the layout
+/// from that interface's own report descriptor. Only one source is used at a
+/// time, so a pen that shows up in two reports is not drawn twice.
 class UsbPenTransport implements PenTransport {
   UsbPenTransport({
     required this.host,
@@ -40,7 +47,14 @@ class UsbPenTransport implements PenTransport {
   final StreamController<int> _battery = StreamController<int>.broadcast();
 
   StreamSubscription<UsbHostEvent>? _eventSub;
-  StreamSubscription<Uint8List>? _reportSub;
+  StreamSubscription<UsbTransfer>? _reportSub;
+  TabletProfile? _profile;
+
+  /// Pen layouts from each endpoint's report descriptor.
+  Map<int, List<PenLayout>> _layouts = const {};
+
+  /// The report the pen is being read from, such as `0x86 id 5`.
+  String? _source;
   UsbPacketizer? _packetizer;
   Timer? _flushTimer;
   String? _openName;
@@ -48,8 +62,8 @@ class UsbPenTransport implements PenTransport {
   bool _userDisconnect = false;
   bool _disposed = false;
 
-  /// Transfers that were not pen reports: the vendor and mouse reports that
-  /// share the interface, or anything malformed.
+  /// Transfers that were not pen reports, or were a second source of the
+  /// same pen: vendor, mouse and keyboard reports, or anything malformed.
   int droppedReports = 0;
 
   int _transfers = 0;
@@ -73,20 +87,27 @@ class UsbPenTransport implements PenTransport {
     final others = _otherIds.entries
         .map((e) => '0x${e.key.toRadixString(16)} x${e.value}')
         .join(', ');
+    final layouts = [
+      for (final entry in _layouts.entries)
+        for (final layout in entry.value)
+          '${_hexByte(entry.key)} ${layout.describe()}',
+    ];
     return [
       'USB: ${_linked ? 'connected' : 'not connected'}, '
           '$_transfers transfers, $_penReports pen reports',
+      'Pen from: ${_source ?? 'nothing yet'}',
+      'Per endpoint: ${text('perEndpoint')}',
       'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
+      'Pen layouts: ${layouts.isEmpty ? 'none found' : layouts.join(' | ')}',
       'Other reports: ${others.isEmpty ? 'none' : others}, '
           'dropped $droppedReports, packets $_packetsSent',
-      'Reader: ${text('readMode')}, transfers ${text('transfers')}, '
+      'Reader: ${text('readMode')}, claimed ${text('claimed')}, '
           'empty ${text('emptyReads')}, last result ${text('lastResult')}',
-      'Claimed: interface ${text('interfaceId')}, '
-          'endpoint ${text('endpoint')}, max packet ${text('maxPacket')}, '
-          'also quieted ${text('quietedInterfaces')}',
       if (interfaces is List) 'Interfaces: ${interfaces.join(' | ')}',
     ];
   }
+
+  static String _hexByte(int value) => '0x${value.toRadixString(16)}';
 
   static int Function() _stopwatchClock() {
     final watch = Stopwatch()..start();
@@ -159,8 +180,9 @@ class UsbPenTransport implements PenTransport {
       _emit(const Unavailable('USB permission denied'));
       return;
     }
+    final List<UsbOpenedInterface> opened;
     try {
-      await host.open(info.name);
+      opened = await host.open(info.name);
     } on Object {
       _emit(const Unavailable("Couldn't open the tablet"));
       return;
@@ -171,6 +193,12 @@ class UsbPenTransport implements PenTransport {
     }
     _openName = info.name;
     _pinnedKey = _keyOf(info);
+    _profile = profile;
+    _layouts = {
+      for (final iface in opened)
+        iface.endpoint: penLayoutsFrom(iface.descriptor ?? Uint8List(0)),
+    };
+    _source = null;
     _packetizer = UsbPacketizer(
       profile: profile,
       bootId: bootId ?? Random().nextInt(0x10000),
@@ -222,14 +250,17 @@ class UsbPenTransport implements PenTransport {
     await _battery.close();
   }
 
-  void _onReport(Uint8List bytes) {
+  void _onReport(UsbTransfer transfer) {
     final packetizer = _packetizer;
-    if (packetizer == null || _disposed) return;
+    final profile = _profile;
+    if (packetizer == null || profile == null || _disposed) return;
+    final bytes = transfer.data;
     _transfers += 1;
     _lastHex = [
+      _hexByte(transfer.endpoint),
       for (final b in bytes.take(12)) b.toRadixString(16).padLeft(2, '0'),
     ].join(' ');
-    final report = parsePenReport(bytes);
+    final report = _penReportFrom(transfer, profile);
     if (report == null) {
       droppedReports += 1;
       if (bytes.isNotEmpty) {
@@ -245,6 +276,43 @@ class UsbPenTransport implements PenTransport {
     if (packetizer.hasPending && _flushTimer == null) {
       _flushTimer = Timer(flushAfter, _flushNow);
     }
+  }
+
+  /// The pen report in [transfer], or null when it is not one or comes from
+  /// a source other than the one in use. Report ID 9 always takes over.
+  PenReport? _penReportFrom(UsbTransfer transfer, TabletProfile profile) {
+    final id9 = parsePenReport(transfer.data);
+    if (id9 != null) {
+      _source = '${_hexByte(transfer.endpoint)} id 9';
+      return id9;
+    }
+    for (final layout in _layouts[transfer.endpoint] ?? const <PenLayout>[]) {
+      final reading = readPen(layout, transfer.data);
+      if (reading == null) continue;
+      final key = '${_hexByte(transfer.endpoint)} id ${layout.reportId}';
+      if (_source != null && _source != key) return null;
+      _source = key;
+      return _scaled(reading, profile);
+    }
+    return null;
+  }
+
+  /// A reading in the same units as Report ID 9, so the profile's corners
+  /// map it onto the whole active area.
+  static PenReport _scaled(PenReading reading, TabletProfile profile) {
+    int across(double unit, int min, int max) =>
+        (min + unit * (max - min)).round();
+    return PenReport(
+      tip: reading.tip,
+      barrel: reading.barrel,
+      eraser: reading.eraser,
+      inRange: reading.inRange,
+      x: across(reading.x, profile.xMin, profile.xMax),
+      y: across(reading.y, profile.yMin, profile.yMax),
+      pressure: (reading.pressure * penMaxPressure).round(),
+      tiltX: reading.tiltX.clamp(-127, 127),
+      tiltY: reading.tiltY.clamp(-127, 127),
+    );
   }
 
   void _flushNow() {
@@ -295,6 +363,7 @@ class UsbPenTransport implements PenTransport {
     final packet = _packetizer?.flush();
     if (packet != null && !_disposed) _notifications.add(packet);
     _packetizer = null;
+    _profile = null;
     await _reportSub?.cancel();
     _reportSub = null;
     if (_openName != null) {

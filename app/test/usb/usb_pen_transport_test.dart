@@ -16,8 +16,11 @@ class FakeUsbHost implements UsbHost {
   int openCalls = 0;
   int closeCalls = 0;
   int permissionRequests = 0;
-  final StreamController<Uint8List> reportController =
-      StreamController<Uint8List>.broadcast();
+  List<UsbOpenedInterface> opened = const [
+    UsbOpenedInterface(interfaceId: 1, endpoint: 0x84),
+  ];
+  final StreamController<UsbTransfer> reportController =
+      StreamController<UsbTransfer>.broadcast();
   final StreamController<UsbHostEvent> eventController =
       StreamController<UsbHostEvent>.broadcast();
 
@@ -45,9 +48,10 @@ class FakeUsbHost implements UsbHost {
   }
 
   @override
-  Future<void> open(String deviceName) async {
+  Future<List<UsbOpenedInterface>> open(String deviceName) async {
     openCalls += 1;
     if (failOpen) throw const UsbHostException('claim failed');
+    return opened;
   }
 
   @override
@@ -60,16 +64,18 @@ class FakeUsbHost implements UsbHost {
     'transfers': 3,
     'emptyReads': 1,
     'lastResult': 10,
-    'interfaceId': 1,
-    'endpoint': 132,
-    'maxPacket': 64,
+    'claimed': 2,
+    'perEndpoint': '0x84:0 0x86:3',
     'readMode': 'request',
-    'quietedInterfaces': 1,
     'interfaces': ['id 0 class 8 eps 0x2,0x83', 'id 1 class 3 eps 0x84'],
   };
 
   @override
-  Stream<Uint8List> get reports => reportController.stream;
+  Stream<UsbTransfer> get reports => reportController.stream;
+
+  void send(String hex, {int endpoint = 0x84}) {
+    reportController.add(UsbTransfer(endpoint, _hex(hex)));
+  }
 
   @override
   Stream<UsbHostEvent> get events => eventController.stream;
@@ -94,6 +100,17 @@ Uint8List _hex(String hex) {
       int.parse(hex.substring(i, i + 2), radix: 16),
   ]);
 }
+
+/// A Report ID 5 style pen report on its own interface: tip, barrel,
+/// padding, in range, padding, then X and Y to 4095 and pressure to 2047.
+final _lowResDescriptor = _hex(
+  '050d0902a10185050920a100'
+  '0942094415002501750195028102'
+  '95028103093295018102950381'
+  '03'
+  '05010930150026ff0f75109501810209318102'
+  '050d093026ff078102c0c0',
+);
 
 Future<void> _settle() => Future<void>.delayed(Duration.zero);
 
@@ -197,8 +214,8 @@ void main() {
 
   test('pen reports become decodable notifications', () async {
     await transport.connect(_tablet.name);
-    host.reportController.add(_hex('09c1b837334d9505aefb'));
-    host.reportController.add(_hex('09c1b837334d9605aefb'));
+    host.send('09c1b837334d9505aefb');
+    host.send('09c1b837334d9605aefb');
     await Future<void>.delayed(const Duration(milliseconds: 30));
     expect(packets, isNotEmpty);
     final result = decode(packets.first);
@@ -216,9 +233,9 @@ void main() {
 
   test('vendor and mouse reports on the same interface are dropped', () async {
     await transport.connect(_tablet.name);
-    host.reportController.add(_hex('0600112233'));
-    host.reportController.add(_hex('03010203'));
-    host.reportController.add(Uint8List(0));
+    host.send('0600112233');
+    host.send('03010203');
+    host.reportController.add(UsbTransfer(0x84, Uint8List(0)));
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(packets, isEmpty);
     expect(transport.droppedReports, 3);
@@ -226,7 +243,7 @@ void main() {
 
   test('unplugging the open tablet reports Disconnected and closes', () async {
     await transport.connect(_tablet.name);
-    host.reportController.add(_hex('09c1b837334d9505aefb'));
+    host.send('09c1b837334d9505aefb');
     host.eventController.add(
       const UsbHostEvent(UsbHostEventType.detached, '/dev/bus/usb/001/004'),
     );
@@ -306,5 +323,53 @@ void main() {
     );
     await Future<void>.delayed(const Duration(milliseconds: 20));
     expect(host.openCalls, 1);
+  });
+
+  test(
+    'a pen report on another interface is read with its descriptor',
+    () async {
+      host.opened = [
+        const UsbOpenedInterface(interfaceId: 1, endpoint: 0x84),
+        UsbOpenedInterface(
+          interfaceId: 2,
+          endpoint: 0x86,
+          descriptor: _lowResDescriptor,
+        ),
+      ];
+      await transport.connect(_tablet.name);
+      // Tip and in range, X 4095 (right edge), Y 0, pressure 2047.
+      host.send('0541ff0f0000ff07', endpoint: 0x86);
+      await Future<void>.delayed(const Duration(milliseconds: 30));
+      final sample =
+          (decode(packets.first) as Decoded).notification.samples.single;
+      expect(sample.touching, isTrue);
+      expect(sample.xMm, closeTo(170, 0.01));
+      expect(sample.yMm, closeTo(0, 0.01));
+      expect(sample.pressure, 16383);
+      final lines = await transport.diagnostics();
+      expect(lines, contains('Pen from: 0x86 id 5'));
+    },
+  );
+
+  test('Report ID 9 takes over and the other pen report is dropped', () async {
+    host.opened = [
+      const UsbOpenedInterface(interfaceId: 1, endpoint: 0x84),
+      UsbOpenedInterface(
+        interfaceId: 2,
+        endpoint: 0x86,
+        descriptor: _lowResDescriptor,
+      ),
+    ];
+    await transport.connect(_tablet.name);
+    host.send('0541ff0f0000ff07', endpoint: 0x86);
+    host.send('09c1b837334d9505aefb');
+    host.send('0541ff0f0000ff07', endpoint: 0x86);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    final samples = [
+      for (final p in packets) ...(decode(p) as Decoded).notification.samples,
+    ];
+    expect(samples, hasLength(2));
+    expect(samples.last.pressure, 1429);
+    expect(transport.droppedReports, 1);
   });
 }

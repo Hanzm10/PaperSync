@@ -25,7 +25,7 @@ At one enumeration (device address 8) it exposed three things:
 | --- | --- | --- | --- |
 | USB mass storage | bulk `0x02` and `0x83` | Likely a virtual driver drive, SCSI traffic | Ignore. Claim nothing here |
 | HID, 228 byte report descriptor | interrupt IN `0x84` | Vendor (ID 6), Mouse (ID 3), Digitizer (ID 9) | Read this one |
-| HID, 256 byte report descriptor | interrupt IN `0x86` | Vendor (ID 1), Keyboard (ID 2), Digitizer (ID 5), Consumer (ID 4) | Ignore. ID 5 is the lower fidelity pen report |
+| HID, 256 byte report descriptor | interrupt IN `0x86` | Vendor (ID 1), Keyboard (ID 2), Digitizer (ID 5), Consumer (ID 4) | ID 5 is the lower fidelity pen report. On an Android phone, the tablet was seen to send the pen here and nothing on `0x84`, so the app reads both and decodes ID 5 from this descriptor when ID 9 is absent |
 
 Windows sends SET_IDLE to each HID interface before reading. Claim only HID class (`0x03`) interfaces.
 

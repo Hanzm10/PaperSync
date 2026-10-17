@@ -41,6 +41,32 @@ class UsbHostEvent {
   final String? deviceName;
 }
 
+/// One HID interface the native side claimed and is reading.
+class UsbOpenedInterface {
+  const UsbOpenedInterface({
+    required this.interfaceId,
+    required this.endpoint,
+    this.descriptor,
+  });
+
+  final int interfaceId;
+
+  /// The interrupt IN endpoint address, such as 0x84.
+  final int endpoint;
+
+  /// The interface's HID report descriptor, or null when the tablet would not
+  /// send it.
+  final Uint8List? descriptor;
+}
+
+/// One interrupt IN transfer and the endpoint it came from.
+class UsbTransfer {
+  const UsbTransfer(this.endpoint, this.data);
+
+  final int endpoint;
+  final Uint8List data;
+}
+
 class UsbHostException implements Exception {
   const UsbHostException(this.message);
 
@@ -58,9 +84,9 @@ abstract interface class UsbHost {
   /// Shows Android's permission dialog when needed. True when allowed.
   Future<bool> requestPermission(String deviceName);
 
-  /// Claims the tablet's pen interface and starts reading. Throws
-  /// [UsbHostException] when that fails.
-  Future<void> open(String deviceName);
+  /// Claims every HID interface of the tablet and starts reading them all.
+  /// Throws [UsbHostException] when nothing could be claimed.
+  Future<List<UsbOpenedInterface>> open(String deviceName);
 
   Future<void> close();
 
@@ -68,7 +94,7 @@ abstract interface class UsbHost {
   Future<Map<String, Object?>> stats();
 
   /// Raw interrupt IN transfers from the open device, one per event.
-  Stream<Uint8List> get reports;
+  Stream<UsbTransfer> get reports;
 
   Stream<UsbHostEvent> get events;
 }
@@ -117,12 +143,32 @@ class MethodChannelUsbHost implements UsbHost {
   }
 
   @override
-  Future<void> open(String deviceName) async {
+  Future<List<UsbOpenedInterface>> open(String deviceName) async {
+    final List<Object?>? raw;
     try {
-      await _channel.invokeMethod<void>('open', {'name': deviceName});
+      raw = await _channel.invokeListMethod<Object?>('open', {
+        'name': deviceName,
+      });
     } on PlatformException catch (error) {
       throw UsbHostException(error.message ?? error.code);
     }
+    final opened = <UsbOpenedInterface>[];
+    for (final item in raw ?? const <Object?>[]) {
+      if (item is! Map<Object?, Object?>) continue;
+      final id = item['interface'];
+      final endpoint = item['endpoint'];
+      final descriptor = item['descriptor'];
+      if (id is int && endpoint is int) {
+        opened.add(
+          UsbOpenedInterface(
+            interfaceId: id,
+            endpoint: endpoint,
+            descriptor: descriptor is Uint8List ? descriptor : null,
+          ),
+        );
+      }
+    }
+    return opened;
   }
 
   @override
@@ -137,11 +183,14 @@ class MethodChannelUsbHost implements UsbHost {
   }
 
   @override
-  Stream<Uint8List> get reports {
-    return _reportChannel
-        .receiveBroadcastStream()
-        .where((event) => event is Uint8List)
-        .cast<Uint8List>();
+  Stream<UsbTransfer> get reports {
+    return _reportChannel.receiveBroadcastStream().expand((event) {
+      if (event is! Map<Object?, Object?>) return const <UsbTransfer>[];
+      final endpoint = event['ep'];
+      final data = event['data'];
+      if (endpoint is! int || data is! Uint8List) return const <UsbTransfer>[];
+      return [UsbTransfer(endpoint, data)];
+    });
   }
 
   // One stream for everyone. Each call to receiveBroadcastStream would listen

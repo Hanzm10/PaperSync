@@ -1,6 +1,6 @@
 # T605 tablet HID reference
 
-Tablet: Lumispark T605 / VINSA T605 (same hardware, made by Gotop Information). Sources: Wireshark USBPcap captures of the real tablet, its HID report descriptor, and hardware tests. Anything not measured yet is marked PENDING.
+Tablet: Lumispark T605 / VINSA T605 (same hardware, made by Gotop Information). Sources: Wireshark USBPcap captures of the real tablet, its HID report descriptor, and hardware tests. The corner values are measured. Anything still unmeasured is marked PENDING.
 
 In code: `app/lib/usb/hid_report.dart` decodes a report and `app/lib/usb/tablet_profile.dart` holds the IDs and corner values.
 
@@ -59,21 +59,32 @@ Used by `app/test/usb/hid_report_test.dart`.
 | `09c0fe3d505c1d00e3e5` | 0 | 1 | 15870 | 23632 | 29 | -29 / -27 |
 | `09c1b837334d9505aefb` | 1 | 1 | 14264 | 19763 | 1429 | -82 / -5 |
 
-## Millimetres and corner values: PENDING
+## Millimetres, corners and orientation: measured
 
-Both axes report 0 to 32767, but the real active area may not span all of it, and the descriptor's physical size does not match the marketed 170 by 107 mm. So millimetres come from measured corners:
+Measured with `papersync_corner_calibration.py`, tip pressed, all four corners and edges.
+
+| | Min | Max | Min is at |
+| --- | --- | --- | --- |
+| X | 0 | 32759 | Left edge |
+| Y | 0 | 32759 | Top edge |
+
+- The tablet uses nearly all of its logical range and clamps at the edges, so values never leave 0 to 32759.
+- X works out to about 193 counts per mm (about 4900 LPI), close to the marketed 5080 LPI.
+- **X and Y have different scales.** The same 0 to 32759 range covers 170 mm across X and 107 mm down Y. Scale each axis separately or drawings come out stretched:
 
 ```
-x_mm = (x - xMin) / (xMax - xMin) * 170
-y_mm = (y - yMin) / (yMax - yMin) * 107
+x_mm = x / 32759 * 170
+y_mm = y / 32759 * 107
 ```
 
-| | Min | Max |
-| --- | --- | --- |
-| X | PENDING | PENDING |
-| Y | PENDING | PENDING |
+- **Orientation:** (0, 0) is the top left corner, X grows to the right and Y grows downward, with the tablet held the way the user holds it to write. That matches screen and Flutter canvas coordinates, so no flip or rotation is needed.
+- The printed corner marks pressed with the pen read: top left x 138, y 147; bottom right x 32253, y 32759. In millimetres that is about (0.7, 0.5) and (167.4, 107).
+- Keep the min, max and mm values as constants in `lumisparkT605`, not inline.
+- The descriptor's physical size does not match the marketed area, so do not use it for millimetres.
 
-Measure with `papersync_corner_calibration.py` (laptop and tshark, no ESP32 needed). Until then the profile uses 0 to 32767, and the four values stay in `lumisparkT605` so a measurement is a one line change with `withCorners`.
+## Tilt is unreliable
+
+Tilt read (85, -82) at one corner and (0, 0) at another while the pen was held normally. Treat it as optional. The app decodes it but stores nothing from it, and no feature should depend on it.
 
 ## Other tablet facts
 

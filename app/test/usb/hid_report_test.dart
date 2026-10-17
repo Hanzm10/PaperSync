@@ -108,11 +108,41 @@ void main() {
       expect(tabletProfileFor(0x1234, 0x6811), isNull);
     });
 
-    test('maps the full logical range onto the active area by default', () {
+    test('uses the measured range of the T605', () {
+      expect(lumisparkT605.xMin, 0);
+      expect(lumisparkT605.xMax, 32759);
+      expect(lumisparkT605.yMin, 0);
+      expect(lumisparkT605.yMax, 32759);
       expect(lumisparkT605.xMm(0), 0);
-      expect(lumisparkT605.xMm(32767), closeTo(170, 1e-9));
-      expect(lumisparkT605.yMm(32767), closeTo(107, 1e-9));
-      expect(lumisparkT605.xMm(16383), closeTo(85, 0.01));
+      expect(lumisparkT605.xMm(32759), closeTo(170, 1e-9));
+      expect(lumisparkT605.yMm(32759), closeTo(107, 1e-9));
+    });
+
+    test('scales the two axes separately', () {
+      // The same raw value is further across X than down Y.
+      expect(lumisparkT605.xMm(16380), closeTo(85, 0.01));
+      expect(lumisparkT605.yMm(16380), closeTo(53.5, 0.01));
+      expect(
+        lumisparkT605.xMm(10000) / lumisparkT605.yMm(10000),
+        closeTo(170 / 107, 1e-9),
+      );
+    });
+
+    test('puts the origin at the top left with no flip', () {
+      // The printed corner marks, pressed with the pen tip.
+      expect(lumisparkT605.xMm(138), closeTo(0.72, 0.01));
+      expect(lumisparkT605.yMm(147), closeTo(0.48, 0.01));
+      expect(lumisparkT605.xMm(32253), closeTo(167.4, 0.1));
+      expect(lumisparkT605.yMm(32759), closeTo(107, 1e-9));
+      // X grows to the right and Y grows downward.
+      expect(lumisparkT605.xMm(20000), greaterThan(lumisparkT605.xMm(10000)));
+      expect(lumisparkT605.yMm(20000), greaterThan(lumisparkT605.yMm(10000)));
+    });
+
+    test('an unmeasured tablet falls back to the full logical range', () {
+      const other = TabletProfile(name: 'Other', vendorId: 1, productId: 2);
+      expect(other.xMax, 32767);
+      expect(other.xMm(32767), closeTo(170, 1e-9));
     });
 
     test('uses measured corners for each axis separately', () {

@@ -132,7 +132,7 @@ Priorities: P0 is needed for the demo, P1 should make it, P2 is later.
 - FR-U8 (P0). Unplugging the cable moves the link to Disconnected within 1 s and ends the open stroke. Plugging in again reconnects without asking permission again when Android already granted it.
 - FR-U9 (P0). Mistakes in HID data (short report, wrong report id, values out of range) are dropped and counted, never thrown. Same untrusted-bytes rules as Bluetooth.
 - FR-U10 (P1). If the tablet needs more than SET_IDLE to start streaming (SET_PROTOCOL, SET_REPORT), the transport sends them from a small table keyed by vendor and product id.
-- FR-U11 (P1). Tilt is X tilt and Y tilt (usages `0x3D` and `0x3E`), signed, -127 to 127, with no declared unit. It is carried through the transport and into `StrokePoint`. Storing it needs the migration in 8.3.
+- FR-U11 (P2). Tilt (X tilt and Y tilt, usages `0x3D` and `0x3E`, signed, no declared unit) is decoded but not stored and no feature depends on it. It read (85, -82) at one corner and (0, 0) at another with the pen held normally, so it is unreliable.
 - FR-U12 (P1). Show a power warning if the tablet browns out the phone port (device resets within 5 s of connect). Suggest a powered adapter.
 - FR-U13 (P0). Two ways to read the tablet on Android, decided by a spike on a real phone in week 1:
   - Raw (primary): `UsbManager` reads the 10 byte reports directly (FR-U5). Full fidelity: 16384 pressure levels and both tilt axes, nothing reaches the UI, and the tablet area is known exactly.
@@ -330,16 +330,22 @@ Full detail is in `docs/hid-t605.md`. Settled:
 - Bytes 8 and 9 are X tilt and Y tilt, not azimuth and altitude. No unit is declared.
 - Two decoded captures are unit test vectors (`app/test/usb/hid_report_test.dart`).
 
+Measured corners (X and Y both 0 to 32759):
+
+- Both axes use 0 to 32759 and clamp at the edges. X is about 193 counts per mm.
+- The two axes have different scales, because the same raw range covers 170 mm across X and 107 mm down Y.
+- (0, 0) is the top left corner, X grows to the right and Y grows downward, so no flip or rotation is needed.
+- The values live in `lumisparkT605` in `app/lib/usb/tablet_profile.dart`.
+
 Still pending:
 
-- Corner raw values for X and Y. Until measured the profile uses 0 to 32767 for both axes, and the four values live in `lumisparkT605` so they are one line to change.
 - Whether Android needs the SET_IDLE that Windows sends to each HID interface.
 
-Mapping to millimetres: `xMm = (x - xMin) * 170 / (xMax - xMin)` and the same for Y with 107, using the measured corners. Do not use the physical size in the descriptor, which does not match the marketed area.
+Mapping to millimetres: `xMm = x / 32759 * 170` and `yMm = y / 32759 * 107`. Do not use the physical size in the descriptor, which does not match the marketed area.
 
 ### 8.3 Data model changes
 
-- Tilt: the SSOT puts two tilt values on `StrokePoint` (it calls them azimuth and altitude, but they are X tilt and Y tilt). Stored points are packed bytes, 16 per point (float32 x, float32 y, uint16 pressure, uint16 flags, uint32 time) in `app/lib/storage/points.dart` and `0001_init.sql`. Two more bytes make 18, which needs a versioned migration on the phone and on the server. P1. Until it ships, tilt is dropped after the transport. The SSOT's schema with `points jsonb` is out of date. Keep packed bytes, which are smaller and size checked.
+- Tilt: not stored for now (FR-U11). Tilt is unreliable on this tablet. If it is ever needed, stored points are packed bytes, 16 per point (float32 x, float32 y, uint16 pressure, uint16 flags, uint32 time) in `app/lib/storage/points.dart` and `0001_init.sql`, and two more bytes need a versioned migration on the phone and on the server. The SSOT's schema with `points jsonb` is out of date. Keep packed bytes, which are smaller and size checked.
 - Flags: add barrel and eraser to the stored flags if bits are free. Check before changing the layout.
 - `docs/decisions.md` and `docs/plans/` still say 12 bytes per point. They should say 16.
 - Add recognized text language and status (`none`, `pending`, `done`, `failed`) to pages.
@@ -350,7 +356,7 @@ Mapping to millimetres: `xMm = (x - xMin) * 170 / (xMax - xMin)` and the same fo
 
 | Need | From | Detail |
 | --- | --- | --- |
-| Corner raw values for X and Y | Hardware | Section 8.2. Measured with `papersync_corner_calibration.py` |
+| Corner raw values for X and Y | Hardware | Measured: 0 to 32759 on both axes (section 8.2) |
 | Firmware reads the Report ID 9 interface (endpoint `0x84`) | Firmware | The tablet also has the Report ID 5 interface |
 | Notifications per section 8.1, sized to the negotiated MTU | Firmware | Needs a yes on v2 |
 | RAM ring buffer, flushed in order on reconnect with the replay flag set | Firmware | SSOT 3.5. RAM only is enough for the demo |
@@ -392,7 +398,7 @@ About three weeks from 2026-10-11.
 
 | Week | Software | Hardware dependency |
 | --- | --- | --- |
-| 1 (Oct 12 to 18) | Spike on a real Android phone (FR-U13): force claim the `0x84` interface and read raw reports, and see what pointer events look like as the fallback. HID to v1 packetizer with unit tests from captured bytes. Fix `PageRow` repaint and grid height. Theme tokens and bottom bar. | Corner values. Any news on the ESP32 host test. |
+| 1 (Oct 12 to 18) | Spike on a real Android phone (FR-U13): force claim the `0x84` interface and read raw reports, and see what pointer events look like as the fallback. HID to v1 packetizer with unit tests from captured bytes. Fix `PageRow` repaint and grid height. Theme tokens and bottom bar. | Any news on the ESP32 host test. |
 | 2 (Oct 19 to 25) | USB mode end to end in the app, with hot unplug and reconnect. Controller link and page marker. Connection setting and plug-in prompt. Library, search and capture restyled. ML Kit recognition and model download flow. | Firmware: marker and battery. |
 | 3 (Oct 26 to Nov 1) | Editor (eraser, lasso, ink style, paper style). Export fit. Real sync switches. Recovery and soak tests. Latency and battery measurements. Demo script and bug fixing. | Hardware freeze. |
 | Buffer | Early November | |
@@ -425,14 +431,14 @@ Decided:
 - Page button is `header_flags` bit 1 (FR-X3).
 - Firmware buffer is RAM only for the demo.
 - Protocol v2 (section 8.1) is accepted on the recommendation in the build agent answers.
-- Vendor id `0x08F2`, product id `0x6811`. Flag bit 7 is constant padding (mask `0x47`). Tilt is X tilt and Y tilt.
+- Vendor id `0x08F2`, product id `0x6811`. Flag bit 7 is constant padding (mask `0x47`). Tilt is X tilt and Y tilt, and it is unreliable.
+- Corner values are measured: X and Y both 0 to 32759, different scales per axis, origin at the top left, no flip.
 
 Still open:
 
-1. Corner raw values for X and Y (pending measurement).
-2. Whether the ESP32 can ever act as USB host. Until it can, hybrid mode is the main Android path and iOS cannot capture (R1).
-3. Raw reports or pointer events for the cable path. The week 1 spike on a real phone decides (FR-U13).
-4. Battery level needs a resistor divider on the ESP32 before the Battery Service can report a real value.
+1. Whether the ESP32 can ever act as USB host. Until it can, hybrid mode is the main Android path and iOS cannot capture (R1).
+2. Raw reports or pointer events for the cable path. The week 1 spike on a real phone decides (FR-U13).
+3. Battery level needs a resistor divider on the ESP32 before the Battery Service can report a real value.
 
 ## 14. Acceptance tests
 

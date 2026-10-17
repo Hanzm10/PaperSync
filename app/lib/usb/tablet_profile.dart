@@ -1,11 +1,16 @@
 /// What the app needs to know about one supported tablet.
 ///
 /// The corner values are the raw X and Y the tablet reports at the edges of
-/// its active area. Until they are measured they default to the full logical
-/// range, 0 to 32767. Keep them here, never inline, so a measurement is a
-/// one line change. The physical size in the report descriptor does not match
-/// the marketed area, so millimetres come from the corners and the area size,
-/// not from the descriptor.
+/// its active area. A tablet that is not measured falls back to the full
+/// logical range, 0 to 32767. Keep the values here, never inline, so a new
+/// measurement is a one line change. The physical size in the report
+/// descriptor does not match the marketed area, so millimetres come from the
+/// corners and the area size, not from the descriptor.
+///
+/// The origin is the top left corner, X grows to the right and Y grows
+/// downward, the same as screen and Flutter canvas coordinates. No flip or
+/// rotation is needed. The two axes have different scales: the same raw range
+/// covers 170 mm across X and 107 mm down Y.
 class TabletProfile {
   const TabletProfile({
     required this.name,
@@ -67,10 +72,17 @@ class TabletProfile {
 }
 
 /// Lumispark / VINSA T605 (made by Gotop Information).
+///
+/// Measured with the pen tip pressed on all four corners and edges. The
+/// tablet clamps at the edges, so values never leave 0 to 32759.
 const TabletProfile lumisparkT605 = TabletProfile(
   name: 'Lumispark T605',
   vendorId: 0x08F2,
   productId: 0x6811,
+  xMin: 0,
+  xMax: 32759,
+  yMin: 0,
+  yMax: 32759,
 );
 
 const List<TabletProfile> knownTablets = [lumisparkT605];

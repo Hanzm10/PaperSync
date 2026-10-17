@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "com.papersync.papersync"
-    compileSdk = flutter.compileSdkVersion
+    // permission_handler_android compiles against Android 37. compileSdk only
+    // sets which APIs the code may use, so it does not change which phones
+    // the app runs on.
+    compileSdk = maxOf(flutter.compileSdkVersion, 37)
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

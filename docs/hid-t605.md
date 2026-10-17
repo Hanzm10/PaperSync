@@ -1,62 +1,80 @@
 # T605 tablet HID reference
 
-Tablet: Lumispark T605 / VINSA T605 (same hardware). Source: the PaperSync single source of truth document and one USBPcap capture taken on Windows.
+Tablet: Lumispark T605 / VINSA T605 (same hardware, made by Gotop Information). Sources: Wireshark USBPcap captures of the real tablet, its HID report descriptor, and hardware tests. Anything not measured yet is marked PENDING.
 
-## Capture facts
+In code: `app/lib/usb/hid_report.dart` decodes a report and `app/lib/usb/tablet_profile.dart` holds the IDs and corner values.
 
-One captured interrupt packet (Wireshark frame 1491):
+## USB identity
 
 | Field | Value |
 | --- | --- |
-| Direction | device to host (IN) |
-| USB bus, device address | 2, 10 |
-| Endpoint | `0x84` (endpoint 4, IN) |
-| Transfer type | interrupt |
-| Interface class | HID (0x03) |
-| Data length | 10 bytes |
-| Status | success |
+| idVendor | `0x08F2` (Gotop Information) |
+| idProduct | `0x6811` |
+| bcdDevice | `0x2024` |
+| bcdUSB | `0x0200` |
+| bMaxPacketSize0 | 64 |
+| Configurations | 1 |
 
-HID data: `09 c0 fe 3d 50 5c 1d 00 e3 e5`
+Raw device descriptor: `12 01 00 02 00 00 00 40 f2 08 11 68 24 20 01 02 03 01`
 
-The "time from request" shown by Wireshark (12.97 ms) is how long that one request waited, not the report interval. Do not derive the sample rate from it. The box and the SSOT give about 330 samples per second.
+## The tablet is a composite device
 
-## Report ID 9 (the one to build against)
+At one enumeration (device address 8) it exposed three things:
 
-All multi-byte fields are little endian.
-
-| Byte | Field | Type | Notes |
+| Interface | Endpoint | What it is | Use |
 | --- | --- | --- | --- |
-| 0 | Report ID | u8 | Always `0x09` |
-| 1 | Flags | u8 | bit0 tip switch (touching), bit1 barrel switch, bit2 eraser, bit6 in range |
-| 2 to 3 | X | u16 | Logical range 0 to 32767 |
-| 4 to 5 | Y | u16 | Logical range 0 to 32767 |
-| 6 to 7 | Pressure | u16 | 0 to 16383 |
-| 8 | Tilt A | i8 | The SSOT calls it azimuth |
-| 9 | Tilt B | i8 | The SSOT calls it altitude |
+| USB mass storage | bulk `0x02` and `0x83` | Likely a virtual driver drive, SCSI traffic | Ignore. Claim nothing here |
+| HID, 228 byte report descriptor | interrupt IN `0x84` | Vendor (ID 6), Mouse (ID 3), Digitizer (ID 9) | Read this one |
+| HID, 256 byte report descriptor | interrupt IN `0x86` | Vendor (ID 1), Keyboard (ID 2), Digitizer (ID 5), Consumer (ID 4) | Ignore. ID 5 is the lower fidelity pen report |
 
-The tablet also exposes a second digitizer interface, Report ID 5 (8 bytes, 12 bit position, no tilt). Ignore it.
+Windows sends SET_IDLE to each HID interface before reading. Claim only HID class (`0x03`) interfaces.
 
-## Decoded sample
+The interface on `0x84` also carries vendor and mouse reports, so the first byte of each interrupt transfer must be checked. Only `0x09` is a pen report. Everything else is dropped and counted.
 
-| Field | Raw | Value |
+## Report ID 9
+
+10 bytes, little endian.
+
+| Byte | Field | Notes |
 | --- | --- | --- |
-| Flags | `0xC0` | in range, tip up, barrel up, eraser off, bit7 set |
-| X | `fe 3d` | 15870 |
-| Y | `50 5c` | 23632 |
-| Pressure | `1d 00` | 29 |
-| Byte 8 | `e3` | -29 |
-| Byte 9 | `e5` | -27 |
+| 0 | Report ID | Always `0x09` |
+| 1 | Flags | bit 0 tip, bit 1 barrel, bit 2 eraser, bits 3 to 5 constant, bit 6 in range, bit 7 constant (sent as 1) |
+| 2 to 3 | X | u16, logical 0 to 32767 |
+| 4 to 5 | Y | u16, logical 0 to 32767 |
+| 6 to 7 | Pressure | u16, 0 to 16383 |
+| 8 | X tilt | i8, -127 to 127 (usage `0x3D`) |
+| 9 | Y tilt | i8, -127 to 127 (usage `0x3E`) |
 
-Things this sample shows that the SSOT does not say:
+- Mask the flags with `0x47` before reading them. Bit 7 is constant padding that the tablet sets to 1 in every report.
+- Bytes 8 and 9 are X tilt and Y tilt, not azimuth and altitude (those would be usages `0x3F` and `0x40`). Earlier notes called them azimuth and altitude, which was wrong.
+- The descriptor declares no angle unit. Treat tilt as relative. It is not verified that it is degrees.
+- Decide contact from the tip bit, never from pressure. A hovering pen can report a small pressure with the tip up.
 
-- Bit 7 of the flags is set. The SSOT lists it as padding. Keep it, do not reject on it, and find out what it is.
-- Pressure is 29 while the tip switch is clear. Decide touching from the tip switch, never from pressure above zero.
-- Bytes 8 and 9 are close to each other and both negative. That looks more like X tilt and Y tilt in degrees than azimuth and altitude. Check the usage codes in the report descriptor (X tilt 0x3D, Y tilt 0x3E, azimuth 0x3F, altitude 0x40) before naming them in code.
+## Test vectors
 
-## Still needed
+Used by `app/test/usb/hid_report_test.dart`.
 
-- USB vendor id and product id (from the device descriptor frame in the capture, or the hardware id in Device Manager).
-- The four corner raw values for X and Y. X and Y both report 0 to 32767, but the active area is 170 by 107 mm, so counts per millimetre differ per axis or Y does not use the full range. Calibrate each axis separately.
-- Whether Android needs the SET_IDLE that Windows sent before reports flow.
+| Hex | Tip | In range | X | Y | Pressure | Tilt X / Y |
+| --- | --- | --- | --- | --- | --- | --- |
+| `09c0fe3d505c1d00e3e5` | 0 | 1 | 15870 | 23632 | 29 | -29 / -27 |
+| `09c1b837334d9505aefb` | 1 | 1 | 14264 | 19763 | 1429 | -82 / -5 |
 
-Test vector for the codec: the 10 bytes above.
+## Millimetres and corner values: PENDING
+
+Both axes report 0 to 32767, but the real active area may not span all of it, and the descriptor's physical size does not match the marketed 170 by 107 mm. So millimetres come from measured corners:
+
+```
+x_mm = (x - xMin) / (xMax - xMin) * 170
+y_mm = (y - yMin) / (yMax - yMin) * 107
+```
+
+| | Min | Max |
+| --- | --- | --- |
+| X | PENDING | PENDING |
+| Y | PENDING | PENDING |
+
+Measure with `papersync_corner_calibration.py` (laptop and tshark, no ESP32 needed). Until then the profile uses 0 to 32767, and the four values stay in `lumisparkT605` so a measurement is a one line change with `withCorners`.
+
+## Other tablet facts
+
+Active area 170 by 107 mm, centered on a 252 by 160 by 5 mm body. Hover height 15 mm. About 330 reports per second. Marketed at 5080 LPI.

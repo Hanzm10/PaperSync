@@ -31,6 +31,10 @@ void main() {
     expect(_layerViolations('ble', const ['ble', 'protocol']), isEmpty);
   });
 
+  test('usb imports nothing outside itself', () {
+    expect(_layerViolations('usb', const ['usb']), isEmpty);
+  });
+
   test('storage imports only domain', () {
     expect(_storageViolations(), isEmpty);
   });

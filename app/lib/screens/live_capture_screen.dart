@@ -128,6 +128,11 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                       ),
                     ),
                     BarAction(
+                      label: 'New page',
+                      glyph: PaperGlyph.plus,
+                      onPressed: () => _controller?.newLivePage(),
+                    ),
+                    BarAction(
                       label: 'Close',
                       glyph: PaperGlyph.close,
                       onPressed: () => Navigator.of(context).pop(),
@@ -183,11 +188,6 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                       label: 'Undo stroke',
                       glyph: PaperGlyph.undo,
                       onPressed: () => _controller?.eraseLastStroke(),
-                    ),
-                    BarAction(
-                      label: 'New page',
-                      glyph: PaperGlyph.plus,
-                      onPressed: () => _controller?.newLivePage(),
                     ),
                   ],
                 ),

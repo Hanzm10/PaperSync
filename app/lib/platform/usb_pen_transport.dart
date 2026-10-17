@@ -1,0 +1,296 @@
+import 'dart:async';
+import 'dart:math';
+import 'dart:typed_data';
+
+import '../ble/link_status.dart';
+import '../ble/pen_transport.dart';
+import '../usb/hid_report.dart';
+import '../usb/tablet_profile.dart';
+import '../usb/usb_packetizer.dart';
+import 'usb_host.dart';
+
+/// The pen over a USB cable to an Android phone.
+///
+/// The tablet is plugged straight into the phone. This reads its raw pen
+/// reports and turns them into the same notification bytes the Bluetooth path
+/// delivers, so nothing downstream changes. There is no battery on this path.
+class UsbPenTransport implements PenTransport {
+  UsbPenTransport({
+    required this.host,
+    int Function()? nowMs,
+    this.bootId,
+    this.flushAfter = const Duration(milliseconds: 16),
+    this.rescanEvery = const Duration(seconds: 2),
+  }) : _nowMs = nowMs ?? _stopwatchClock() {
+    _eventSub = host.events.listen(_onHostEvent, onError: (Object _) {});
+  }
+
+  final UsbHost host;
+
+  /// Fixes the boot id for a test. Left null, each connection picks one.
+  final int? bootId;
+  final Duration flushAfter;
+  final Duration rescanEvery;
+  final int Function() _nowMs;
+
+  final StreamController<LinkStatus> _status =
+      StreamController<LinkStatus>.broadcast();
+  final StreamController<Uint8List> _notifications =
+      StreamController<Uint8List>.broadcast();
+  final StreamController<int> _battery = StreamController<int>.broadcast();
+
+  StreamSubscription<UsbHostEvent>? _eventSub;
+  StreamSubscription<Uint8List>? _reportSub;
+  UsbPacketizer? _packetizer;
+  Timer? _flushTimer;
+  String? _openName;
+  String? _pinnedKey;
+  bool _userDisconnect = false;
+  bool _disposed = false;
+
+  /// Transfers that were not pen reports: the vendor and mouse reports that
+  /// share the interface, or anything malformed.
+  int droppedReports = 0;
+
+  static int Function() _stopwatchClock() {
+    final watch = Stopwatch()..start();
+    return () => watch.elapsedMilliseconds;
+  }
+
+  @override
+  Stream<List<FoundPen>> scan() {
+    // The listener's cancel ends it, so there is nothing else to close.
+    // ignore: close_sinks
+    late StreamController<List<FoundPen>> controller;
+    StreamSubscription<UsbHostEvent>? events;
+    Timer? timer;
+    List<FoundPen>? last;
+
+    Future<void> refresh() async {
+      final found = await _found();
+      if (controller.isClosed) return;
+      if (last != null && _samePens(last!, found)) return;
+      last = found;
+      controller.add(found);
+    }
+
+    controller = StreamController<List<FoundPen>>(
+      onListen: () {
+        unawaited(refresh());
+        events = host.events.listen(
+          (_) => unawaited(refresh()),
+          onError: (Object _) {},
+        );
+        // Android only tells a running app about a plug in through the
+        // activity, so look again every so often as a fallback.
+        timer = Timer.periodic(rescanEvery, (_) => unawaited(refresh()));
+      },
+      onCancel: () async {
+        timer?.cancel();
+        await events?.cancel();
+      },
+    );
+    return controller.stream;
+  }
+
+  @override
+  Future<void> connect(String deviceId) async {
+    if (_disposed) return;
+    _userDisconnect = false;
+    await _closeLink();
+    _emit(const Connecting());
+    final info = await _find(deviceId);
+    if (_disposed) return;
+    if (info == null) {
+      _emit(const Unavailable('The tablet is not plugged in'));
+      return;
+    }
+    final profile = tabletProfileFor(info.vendorId, info.productId);
+    if (profile == null) {
+      _emit(const Unavailable('This USB device is not a supported tablet'));
+      return;
+    }
+    var allowed = info.hasPermission;
+    if (!allowed) {
+      try {
+        allowed = await host.requestPermission(info.name);
+      } on Object {
+        allowed = false;
+      }
+    }
+    if (_disposed) return;
+    if (!allowed) {
+      _emit(const Unavailable('USB permission denied'));
+      return;
+    }
+    try {
+      await host.open(info.name);
+    } on Object {
+      _emit(const Unavailable("Couldn't open the tablet"));
+      return;
+    }
+    if (_disposed) {
+      await _safeClose();
+      return;
+    }
+    _openName = info.name;
+    _pinnedKey = _keyOf(info);
+    _packetizer = UsbPacketizer(
+      profile: profile,
+      bootId: bootId ?? Random().nextInt(0x10000),
+    );
+    _reportSub = host.reports.listen(_onReport, onError: (Object _) {});
+    _emit(const Connected(mtu: 0, rssi: 0));
+  }
+
+  @override
+  Future<void> disconnect() async {
+    _userDisconnect = true;
+    await _closeLink();
+    _emit(const Disconnected());
+  }
+
+  @override
+  Future<void> forget() async {
+    _pinnedKey = null;
+    await disconnect();
+  }
+
+  @override
+  Stream<Uint8List> get notifications => _notifications.stream;
+
+  @override
+  Stream<LinkStatus> get status => _status.stream;
+
+  /// The tablet has no battery to report.
+  @override
+  Stream<int> get battery => _battery.stream;
+
+  @override
+  Future<void> dispose() async {
+    if (_disposed) return;
+    _disposed = true;
+    _userDisconnect = true;
+    await _eventSub?.cancel();
+    _eventSub = null;
+    await _closeLink();
+    await _status.close();
+    await _notifications.close();
+    await _battery.close();
+  }
+
+  void _onReport(Uint8List bytes) {
+    final packetizer = _packetizer;
+    if (packetizer == null || _disposed) return;
+    final report = parsePenReport(bytes);
+    if (report == null) {
+      droppedReports += 1;
+      return;
+    }
+    for (final packet in packetizer.add(report, _nowMs())) {
+      _notifications.add(packet);
+    }
+    if (packetizer.hasPending && _flushTimer == null) {
+      _flushTimer = Timer(flushAfter, _flushNow);
+    }
+  }
+
+  void _flushNow() {
+    _flushTimer = null;
+    final packet = _packetizer?.flush();
+    if (packet != null && !_disposed) _notifications.add(packet);
+  }
+
+  void _onHostEvent(UsbHostEvent event) {
+    if (_disposed) return;
+    switch (event.type) {
+      case UsbHostEventType.detached:
+        if (event.deviceName != null && event.deviceName == _openName) {
+          unawaited(_lost());
+        }
+      case UsbHostEventType.attached:
+        unawaited(_maybeReconnect());
+    }
+  }
+
+  /// The cable came out. The stroke in progress is closed by the capture
+  /// code when it sees the link drop.
+  Future<void> _lost() async {
+    await _closeLink();
+    _emit(const Disconnected());
+  }
+
+  /// Plugging the same tablet back in reconnects without a prompt when
+  /// Android still allows access.
+  Future<void> _maybeReconnect() async {
+    final pinned = _pinnedKey;
+    if (pinned == null || _openName != null || _userDisconnect) return;
+    for (final info in await _safeDevices()) {
+      if (_keyOf(info) == pinned && info.hasPermission) {
+        await connect(info.name);
+        return;
+      }
+    }
+  }
+
+  Future<void> _closeLink() async {
+    _flushTimer?.cancel();
+    _flushTimer = null;
+    final packet = _packetizer?.flush();
+    if (packet != null && !_disposed) _notifications.add(packet);
+    _packetizer = null;
+    await _reportSub?.cancel();
+    _reportSub = null;
+    if (_openName != null) {
+      _openName = null;
+      await _safeClose();
+    }
+  }
+
+  Future<void> _safeClose() async {
+    try {
+      await host.close();
+    } on Object {
+      // Nothing left to release.
+    }
+  }
+
+  Future<List<UsbDeviceInfo>> _safeDevices() async {
+    try {
+      return await host.devices();
+    } on Object {
+      return const [];
+    }
+  }
+
+  Future<UsbDeviceInfo?> _find(String deviceId) async {
+    for (final info in await _safeDevices()) {
+      if (info.name == deviceId) return info;
+    }
+    return null;
+  }
+
+  Future<List<FoundPen>> _found() async {
+    final found = <FoundPen>[];
+    for (final info in await _safeDevices()) {
+      final profile = tabletProfileFor(info.vendorId, info.productId);
+      if (profile == null) continue;
+      found.add(FoundPen(id: info.name, name: profile.name, rssi: 0));
+    }
+    return found;
+  }
+
+  String _keyOf(UsbDeviceInfo info) => '${info.vendorId}:${info.productId}';
+
+  bool _samePens(List<FoundPen> a, List<FoundPen> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  void _emit(LinkStatus status) {
+    if (!_disposed) _status.add(status);
+  }
+}

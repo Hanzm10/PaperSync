@@ -127,7 +127,7 @@ Priorities: P0 is needed for the demo, P1 should make it, P2 is later.
 - FR-U3 (P0). The app requests USB permission with the system dialog and handles three outcomes: granted, denied, device removed during the prompt. Denial shows a one line explanation and a retry.
 - FR-U4 (P0). Declare a `usb-device` filter in the manifest so plugging in the tablet can offer to open PaperSync. Without a match the app does nothing on plug in.
 - FR-U5 (P0). After permission: the tablet is a composite device, so claim only the HID interface whose interrupt IN endpoint is `0x84` (report descriptor of 228 bytes). Do not claim the USB mass storage interface or the HID interface on `0x86`. Force claim so Android's own HID handling lets go, send SET_IDLE, and read interrupt IN transfers continuously on a native thread. The `0x84` interface also carries vendor (ID 6) and mouse (ID 3) reports, so keep only transfers that start with `0x09` and count the rest as dropped.
-- FR-U6 (P0). Wrap raw Report ID 9 reports into the notification format in section 8.1. The transport owns `boot_id` (random per connection), `first_seq` (counts from 0 per connection) and `base_time_ms` (monotonic milliseconds since connect), and sets `dt_ms` per record. Pack up to 17 records or 50 ms into one notification, whichever comes first.
+- FR-U6 (P0). Wrap raw Report ID 9 reports into notification packets. Built: `app/lib/usb/usb_packetizer.dart` emits protocol v1 packets (the format the decoder and capture machine already read), converting X and Y to millimetres with the tablet profile, so nothing downstream changes. v1 has no tilt and no eraser bit, so tilt is dropped and an eraser tip is sent as a hover. The phone owns `boot_id` (random per connection), the sequence number and the clock. A packet is sent at 17 records or 16 ms, whichever comes first, which keeps the pen to screen delay well under 50 ms. When the decoder learns protocol v2 (section 8.1) this switches to v2.
 - FR-U7 (P0). Touching comes from the Tip Switch flag (bit 0), hover from In Range (bit 6), never from pressure above zero. The captured hover sample has pressure 29 with the tip up. Mask the flags with `0x47` before reading them: bit 7 is constant padding that the tablet sends as 1. Pen leaving range flushes the batch immediately.
 - FR-U8 (P0). Unplugging the cable moves the link to Disconnected within 1 s and ends the open stroke. Plugging in again reconnects without asking permission again when Android already granted it.
 - FR-U9 (P0). Mistakes in HID data (short report, wrong report id, values out of range) are dropped and counted, never thrown. Same untrusted-bytes rules as Bluetooth.
@@ -142,6 +142,12 @@ Priorities: P0 is needed for the demo, P1 should make it, P2 is later.
 
 Implementation note: Flutter has no first-party HID over USB plugin. Write a small Kotlin platform channel (`UsbManager`, `UsbDeviceConnection`, `UsbRequest`) behind the Dart interface. Keep the Dart side in `lib/usb`, with layer rules matching `lib/ble` (imports `protocol` only). The platform channel lives in `lib/platform`.
 
+Status of the cable path (built, not yet run on a phone):
+
+- Dart: `UsbPenTransport` (`app/lib/platform/usb_pen_transport.dart`) implements `PenTransport`. It scans for supported tablets by vendor and product id, asks for USB permission, opens the device, drops reports that are not Report ID 9, reports Connected and Disconnected, and reconnects without a prompt when the same tablet is plugged back in and Android still allows it.
+- Kotlin: `UsbHostPlugin.kt` claims only the HID interface on endpoint `0x84` (force claim), sends SET_IDLE, and reads interrupt transfers on a background thread. The manifest declares an optional USB host feature and a USB_DEVICE_ATTACHED filter for the T605, so plugging it in offers to open PaperSync. This is the raw reports route (FR-U13). It has not been compiled or run: there is no Android SDK or phone in the build environment.
+- Settings: on Android only, a Connection row switches between Bluetooth (default) and USB cable. The choice is remembered. The pairing screen says "Plug in your tablet" in USB mode.
+
 ### 6.3 Controller link (hybrid mode)
 
 In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accessory.
@@ -150,7 +156,7 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 - FR-X2 (P0). A page marker from the controller's physical page button starts a new page. The button is wired to a spare ESP32 GPIO (the BOOT button on the dev board until the final button exists). The app closes the current page and opens the next one at that point in the timeline.
 - FR-X3 (P0). Wire form: the page button is bit 1 of `header_flags` on a notification (section 8.1). A notification with no records is allowed, so firmware can send it the moment the button is pressed. This replaces the earlier idea of a record flag, because bit 2 of the raw HID flags is Eraser.
 - FR-X4 (P1). Controller LED status (connected, capturing, low battery) is driven by firmware from its own state. The app does not write to it in this release.
-- FR-X5 (P0). If the controller is not connected in hybrid mode, capture still works. A new page then needs an on-screen New page button. Show a quiet "Controller not connected" note, not an error.
+- FR-X5 (P0). If the controller is not connected in hybrid mode, capture still works. A new page then needs an on-screen New page button. Built: Live Capture has a New page button in its header. Show a quiet "Controller not connected" note, not an error.
 
 ### 6.4 Capture
 

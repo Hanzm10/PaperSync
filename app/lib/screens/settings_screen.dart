@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/app_controller.dart';
 import '../state/cloud.dart';
+import '../state/connection_mode.dart';
+import '../state/pen_transport_provider.dart';
 import '../state/ui_preferences.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
@@ -23,6 +25,8 @@ class SettingsScreen extends ConsumerWidget {
     final prefsController = ref.read(uiPreferencesProvider.notifier);
     final link = ref.watch(appControllerProvider).link;
     final status = ref.watch(syncStatusProvider);
+    final usbSupported = ref.watch(usbSupportedProvider);
+    final mode = ref.watch(connectionModeProvider);
     final signedIn = ref.watch(paperSyncAuthProvider).current != null;
     final email = prefs.email.trim();
     final heading = signedIn && email.isNotEmpty ? email : 'Not signed in';
@@ -80,6 +84,24 @@ class SettingsScreen extends ConsumerWidget {
                   );
                 },
               ),
+              if (usbSupported)
+                SettingsTile(
+                  key: const Key('connection-mode-tile'),
+                  title: 'Connection',
+                  subtitle: mode == ConnectionMode.bluetooth
+                      ? 'Bluetooth is the default'
+                      : 'Tablet plugged into this phone',
+                  trailing: Text(
+                    mode.label,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                  onPressed: () {
+                    final next = mode == ConnectionMode.bluetooth
+                        ? ConnectionMode.usb
+                        : ConnectionMode.bluetooth;
+                    ref.read(connectionModeProvider.notifier).select(next);
+                  },
+                ),
               SettingsTile(
                 title: 'Sync',
                 subtitle: syncRowLabel(status),

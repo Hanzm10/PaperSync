@@ -39,6 +39,11 @@ enum TabletTurn {
   }
 }
 
+/// Which way the tablet is turned unless the user says otherwise. The
+/// supported setup has the tablet's three buttons along the bottom, which is
+/// the tablet turned to the left.
+const TabletTurn defaultTabletTurn = TabletTurn.left;
+
 /// Moves a position from the tablet's own frame to the portrait page.
 ///
 /// [xMm] runs 0 to 170 and [yMm] 0 to 107 in the tablet's frame. The result is

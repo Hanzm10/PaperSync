@@ -101,7 +101,7 @@ void main() {
         .firstWhere((item) => item.touching);
     // The pen reports in the tablet's frame, and capture turns it onto the
     // portrait page.
-    final moved = turnTablet(sample.xMm, sample.yMm, TabletTurn.right);
+    final moved = turnTablet(sample.xMm, sample.yMm, defaultTabletTurn);
     final stored = page.strokes.expand((stroke) => stroke.points);
     expect(stored.any((point) => (point.xMm - moved.x).abs() < 0.02), isTrue);
     expect(find.byKey(const Key('debug-ink-overlay')), findsNothing);

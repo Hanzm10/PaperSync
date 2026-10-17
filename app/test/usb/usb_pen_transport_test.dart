@@ -63,6 +63,8 @@ class FakeUsbHost implements UsbHost {
     'interfaceId': 1,
     'endpoint': 132,
     'maxPacket': 64,
+    'readMode': 'request',
+    'quietedInterfaces': 1,
     'interfaces': ['id 0 class 8 eps 0x2,0x83', 'id 1 class 3 eps 0x84'],
   };
 

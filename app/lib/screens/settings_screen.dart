@@ -91,8 +91,9 @@ class SettingsScreen extends ConsumerWidget {
                 SettingsTile(
                   key: const Key('tablet-turn-tile'),
                   title: 'Tablet orientation',
-                  subtitle:
-                      'Which way the tablet is turned for a portrait page',
+                  subtitle: turn == TabletTurn.left
+                      ? "The tablet's buttons are along the bottom"
+                      : "The tablet's buttons are along the top",
                   trailing: Text(
                     turn.label,
                     style: Theme.of(context).textTheme.labelMedium,

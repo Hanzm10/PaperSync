@@ -86,7 +86,7 @@ final tabletTurnProvider = NotifierProvider<TabletTurnController, TabletTurn>(
   TabletTurnController.new,
 );
 
-/// Which way the tablet is turned to make the page portrait. Turned right
+/// Which way the tablet is turned to make the page portrait. Turned left
 /// until the user says otherwise.
 class TabletTurnController extends Notifier<TabletTurn> {
   bool _alive = true;
@@ -96,7 +96,7 @@ class TabletTurnController extends Notifier<TabletTurn> {
     _alive = true;
     ref.onDispose(() => _alive = false);
     if (!ref.watch(useSimulatorProvider)) unawaited(_load());
-    return TabletTurn.right;
+    return defaultTabletTurn;
   }
 
   Future<void> _load() async {

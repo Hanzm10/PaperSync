@@ -11,6 +11,7 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import android.hardware.usb.UsbRequest
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -18,6 +19,8 @@ import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.nio.ByteBuffer
+import java.util.concurrent.TimeoutException
 
 /**
  * Reads the tablet's raw pen reports over USB host and hands them to Dart.
@@ -32,6 +35,14 @@ import io.flutter.plugin.common.MethodChannel
  *  - method: devices, requestPermission, open, close
  *  - events "reports": one ByteArray per interrupt transfer
  *  - events "events": {type: attached|detached, name: String?}
+ *
+ * Interrupt IN endpoints are read with UsbRequest, which is the method Android
+ * provides for them. Plain bulkTransfer is only a fallback, because many
+ * phones refuse it on an interrupt endpoint.
+ *
+ * Once a pen report (Report ID 9) has really arrived, the other HID
+ * interfaces of the tablet are claimed too. That stops Android from also
+ * turning the tablet into a mouse, which would press buttons in the app.
  */
 class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHandler {
     companion object {
@@ -42,6 +53,7 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
         private const val SET_IDLE_REQUEST = 0x0A
         private const val CONTROL_TIMEOUT_MS = 1000
         private const val MIN_BUFFER = 16
+        private const val PEN_REPORT_ID = 0x09
     }
 
     private val usbManager = context.getSystemService(Context.USB_SERVICE) as UsbManager
@@ -69,6 +81,17 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
 
     @Volatile
     private var lastResult = 0
+
+    @Volatile
+    private var readMode = "none"
+
+    @Volatile
+    private var penReportSeen = false
+
+    @Volatile
+    private var quietedInterfaces = 0
+
+    private val extraClaimed = mutableListOf<UsbInterface>()
 
     private var claimedInterfaceId = -1
     private var claimedEndpointAddress = -1
@@ -172,6 +195,9 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
             "transfers" to transferCount,
             "emptyReads" to emptyReads,
             "lastResult" to lastResult,
+            "readMode" to readMode,
+            "penReportSeen" to penReportSeen,
+            "quietedInterfaces" to quietedInterfaces,
             "interfaces" to interfaceSummary,
         )
     }
@@ -263,7 +289,7 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
         connection = conn
         claimed = iface
         openName = device.deviceName
-        startReader(conn, endpoint, device.deviceName)
+        startReader(conn, endpoint, device)
         result.success(null)
     }
 
@@ -284,25 +310,30 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
         return null
     }
 
-    private fun startReader(conn: UsbDeviceConnection, endpoint: UsbEndpoint, name: String) {
+    private fun startReader(conn: UsbDeviceConnection, endpoint: UsbEndpoint, device: UsbDevice) {
         transferCount = 0L
         emptyReads = 0L
         lastResult = 0
+        readMode = "none"
+        penReportSeen = false
+        quietedInterfaces = 0
         reading = true
+        val name = device.deviceName
         val size = maxOf(endpoint.maxPacketSize, MIN_BUFFER)
         val thread = Thread {
-            val buffer = ByteArray(size)
-            while (reading) {
-                val count = conn.bulkTransfer(endpoint, buffer, buffer.size, READ_TIMEOUT_MS)
-                lastResult = count
-                if (count > 0) {
-                    transferCount += 1
-                    val copy = buffer.copyOf(count)
-                    mainHandler.post { reportSink?.success(copy) }
-                } else {
-                    emptyReads += 1
-                    if (!usbManager.deviceList.containsKey(name)) break
+            val request = UsbRequest()
+            if (request.initialize(conn, endpoint)) {
+                readMode = "request"
+                readWithRequests(conn, request, size, device)
+                try {
+                    request.cancel()
+                    request.close()
+                } catch (e: Exception) {
+                    // Already closed with the connection.
                 }
+            } else {
+                readMode = "bulk"
+                readWithBulk(conn, endpoint, size, device)
             }
             if (reading) {
                 // The device went away without being closed.
@@ -318,6 +349,119 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
         thread.isDaemon = true
         reader = thread
         thread.start()
+    }
+
+    private fun readWithRequests(
+        conn: UsbDeviceConnection,
+        request: UsbRequest,
+        size: Int,
+        device: UsbDevice,
+    ) {
+        val name = device.deviceName
+        val buffer = ByteBuffer.allocate(size)
+        var pending = false
+        while (reading) {
+            if (!pending) {
+                buffer.clear()
+                val queued = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    request.queue(buffer)
+                } else {
+                    request.queue(buffer, size)
+                }
+                if (!queued) {
+                    lastResult = -2
+                    emptyReads += 1
+                    if (!usbManager.deviceList.containsKey(name)) break
+                    sleepQuietly(20)
+                    continue
+                }
+                pending = true
+            }
+            val done: UsbRequest? = try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    conn.requestWait(READ_TIMEOUT_MS.toLong())
+                } else {
+                    conn.requestWait()
+                }
+            } catch (e: TimeoutException) {
+                null
+            }
+            if (done == null) {
+                // No report yet, or the connection was closed. The request
+                // stays queued, so wait on it again without queueing twice.
+                lastResult = -1
+                emptyReads += 1
+                if (!usbManager.deviceList.containsKey(name)) break
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) sleepQuietly(20)
+                continue
+            }
+            pending = false
+            val count = buffer.position()
+            lastResult = count
+            if (count > 0) {
+                handleReport(conn, device, buffer.array().copyOf(count))
+            } else {
+                emptyReads += 1
+            }
+        }
+    }
+
+    private fun readWithBulk(
+        conn: UsbDeviceConnection,
+        endpoint: UsbEndpoint,
+        size: Int,
+        device: UsbDevice,
+    ) {
+        val name = device.deviceName
+        val buffer = ByteArray(size)
+        while (reading) {
+            val started = System.currentTimeMillis()
+            val count = conn.bulkTransfer(endpoint, buffer, buffer.size, READ_TIMEOUT_MS)
+            lastResult = count
+            if (count > 0) {
+                handleReport(conn, device, buffer.copyOf(count))
+            } else {
+                emptyReads += 1
+                if (!usbManager.deviceList.containsKey(name)) break
+                // An error that returns at once would otherwise spin.
+                if (System.currentTimeMillis() - started < 20) sleepQuietly(20)
+            }
+        }
+    }
+
+    private fun handleReport(conn: UsbDeviceConnection, device: UsbDevice, bytes: ByteArray) {
+        transferCount += 1
+        mainHandler.post { reportSink?.success(bytes) }
+        if (!penReportSeen && bytes.isNotEmpty() && bytes[0].toInt() == PEN_REPORT_ID) {
+            penReportSeen = true
+            quietOtherInterfaces(conn, device)
+        }
+    }
+
+    /**
+     * Claims the tablet's other HID interfaces so Android stops treating it as
+     * a mouse or stylus. This only happens after a pen report has arrived,
+     * which proves the raw route works, so the tablet is never left with
+     * nothing reading it.
+     */
+    private fun quietOtherInterfaces(conn: UsbDeviceConnection, device: UsbDevice) {
+        for (i in 0 until device.interfaceCount) {
+            val iface = device.getInterface(i)
+            if (iface.interfaceClass != UsbConstants.USB_CLASS_HID) continue
+            if (iface.id == claimedInterfaceId) continue
+            if (conn.claimInterface(iface, true)) {
+                extraClaimed.add(iface)
+                quietedInterfaces += 1
+            }
+        }
+    }
+
+    private fun sleepQuietly(ms: Long) {
+        try {
+            Thread.sleep(ms)
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 
     private fun closeLink() {
@@ -336,8 +480,11 @@ class UsbHostPlugin(private val context: Context) : MethodChannel.MethodCallHand
         connection = null
         claimed = null
         openName = null
+        val extras = extraClaimed.toList()
+        extraClaimed.clear()
         if (conn != null) {
             try {
+                for (extra in extras) conn.releaseInterface(extra)
                 if (iface != null) conn.releaseInterface(iface)
             } catch (e: Exception) {
                 // Already gone.

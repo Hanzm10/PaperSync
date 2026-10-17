@@ -13,7 +13,7 @@ import '../theme/tokens.dart';
 class UsbCheck extends ConsumerStatefulWidget {
   const UsbCheck({super.key, this.compact = false});
 
-  /// Only the first two lines.
+  /// Only the first four lines.
   final bool compact;
 
   @override
@@ -49,7 +49,7 @@ class _UsbCheckState extends ConsumerState<UsbCheck> {
   Widget build(BuildContext context) {
     final lines = _lines;
     if (lines == null) return const SizedBox.shrink();
-    final shown = widget.compact ? lines.take(2).toList() : lines;
+    final shown = widget.compact ? lines.take(4).toList() : lines;
     return Padding(
       key: const Key('usb-check'),
       padding: const EdgeInsets.symmetric(

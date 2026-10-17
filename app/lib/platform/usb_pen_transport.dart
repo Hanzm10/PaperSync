@@ -79,10 +79,11 @@ class UsbPenTransport implements PenTransport {
       'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
       'Other reports: ${others.isEmpty ? 'none' : others}, '
           'dropped $droppedReports, packets $_packetsSent',
-      'Reader: transfers ${text('transfers')}, empty ${text('emptyReads')}, '
-          'last result ${text('lastResult')}',
+      'Reader: ${text('readMode')}, transfers ${text('transfers')}, '
+          'empty ${text('emptyReads')}, last result ${text('lastResult')}',
       'Claimed: interface ${text('interfaceId')}, '
-          'endpoint ${text('endpoint')}, max packet ${text('maxPacket')}',
+          'endpoint ${text('endpoint')}, max packet ${text('maxPacket')}, '
+          'also quieted ${text('quietedInterfaces')}',
       if (interfaces is List) 'Interfaces: ${interfaces.join(' | ')}',
     ];
   }

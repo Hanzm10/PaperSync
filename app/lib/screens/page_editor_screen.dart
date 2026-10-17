@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -12,6 +14,7 @@ import '../widgets/dialogs.dart';
 import '../widgets/editor_bar.dart';
 import '../widgets/ink_page.dart';
 import '../widgets/zoomable_sheet.dart';
+import 'live_capture_screen.dart';
 
 class PageEditorScreen extends ConsumerStatefulWidget {
   const PageEditorScreen({
@@ -63,6 +66,11 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
                     : 'Set as live page (connect a pen)',
               ),
             ),
+            if (!isLive)
+              const PopupMenuItem(
+                value: 'draw',
+                child: Text('Draw on this page'),
+              ),
             const PopupMenuItem(value: 'pdf', child: Text('Export PDF')),
             const PopupMenuItem(value: 'image', child: Text('Export image')),
             PopupMenuItem(
@@ -207,6 +215,21 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
             context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Connect a pen to make a page live.')),
+          );
+        }
+      case 'draw':
+        if (controller.assignLivePage(
+          widget.notebookId,
+          page.id,
+          phone: true,
+        )) {
+          unawaited(
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute<void>(
+                builder: (_) =>
+                    LiveCaptureScreen(notebookId: widget.notebookId),
+              ),
+            ),
           );
         }
       case 'pdf':

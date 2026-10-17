@@ -94,35 +94,18 @@ class NotebookPagesScreen extends ConsumerWidget {
               PaperTokens.space16,
             ),
             sliver: SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SecondaryButton(
-                    key: const Key('draw-on-phone-button'),
-                    label: 'Draw on phone',
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => LiveCaptureScreen(
-                            notebookId: notebookId,
-                            startInPhoneDrawing: true,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  if (connected && model.livePageId == null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: PaperTokens.space8),
-                      child: Text(
-                        'Open a page and choose Set as live page to write '
-                        'into it with the pen.',
-                        key: const Key('live-page-hint'),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
-                ],
-              ),
+              child: model.livePageId == null
+                  ? Text(
+                      connected
+                          ? 'Open a page and choose Set as live page to write '
+                                'into it with the pen, or Draw on this page to '
+                                'draw on the phone.'
+                          : 'Open a page and choose Draw on this page to draw '
+                                'on the phone.',
+                      key: const Key('live-page-hint'),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
           SliverPadding(
@@ -161,6 +144,7 @@ class NotebookPagesScreen extends ConsumerWidget {
                     return PageRow(
                       page: page,
                       live: live,
+                      liveLabel: model.phoneDrawing ? 'Drawing' : 'Live',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(

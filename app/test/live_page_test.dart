@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:papersync/ble/simulated_pen_transport.dart';
 import 'package:papersync/models/ink_models.dart';
 import 'package:papersync/models/pen_link.dart';
+import 'package:papersync/screens/live_capture_screen.dart';
 import 'package:papersync/screens/notebook_pages_screen.dart';
+import 'package:papersync/screens/page_editor_screen.dart';
 import 'package:papersync/state/app_controller.dart';
 import 'package:papersync/state/pen_transport_provider.dart';
 import 'package:papersync/theme/app_theme.dart';
@@ -47,6 +49,41 @@ void main() {
       final model = container.read(appControllerProvider);
       expect(model.livePageId, 'page-1');
       expect(model.liveNotebookId, 'nb');
+    });
+
+    test('a page can be drawn on without a pen', () {
+      final container = containerWith(_model(connected: false));
+      final controller = container.read(appControllerProvider.notifier);
+      expect(controller.assignLivePage('nb', 'page-2', phone: true), isTrue);
+      final model = container.read(appControllerProvider);
+      expect(model.livePageId, 'page-2');
+      expect(model.phoneDrawing, isTrue);
+      controller
+        ..drawStart(const Offset(20, 20))
+        ..drawMove(const Offset(40, 40))
+        ..drawEnd();
+      expect(
+        container.read(appControllerProvider).page('page-2')!.strokes,
+        hasLength(1),
+      );
+    });
+
+    test('closing the live view ends a phone page but not a pen page', () {
+      final phone = containerWith(_model(connected: true));
+      phone.read(appControllerProvider.notifier)
+        ..assignLivePage('nb', 'page-1', phone: true)
+        ..leaveLiveView();
+      expect(phone.read(appControllerProvider).livePageId, isNull);
+      expect(phone.read(appControllerProvider).phoneDrawing, isFalse);
+
+      final pen = containerWith(_model(connected: true));
+      pen.read(appControllerProvider.notifier)
+        ..assignLivePage('nb', 'page-1')
+        ..setPhoneDrawing(true)
+        ..leaveLiveView();
+      final model = pen.read(appControllerProvider);
+      expect(model.livePageId, 'page-1');
+      expect(model.phoneDrawing, isFalse);
     });
 
     test('clearing the live page stops capture and keeps the ink', () {
@@ -159,7 +196,9 @@ void main() {
     testWidgets('offers Connect pen when no pen is connected', (tester) async {
       await pump(tester, _model(connected: false));
       expect(find.byKey(const Key('connect-pen-button')), findsOneWidget);
-      expect(find.byKey(const Key('live-page-hint')), findsNothing);
+      expect(find.byKey(const Key('live-page-hint')), findsOneWidget);
+      expect(find.textContaining('Draw on this page'), findsOneWidget);
+      expect(find.textContaining('Set as live page'), findsNothing);
     });
 
     testWidgets('marks the live page with a badge', (tester) async {
@@ -173,6 +212,40 @@ void main() {
       await tester.pump();
       expect(find.byKey(const Key('live-badge')), findsOneWidget);
       expect(find.byKey(const Key('live-page-hint')), findsNothing);
+    });
+  });
+
+  group('page menu', () {
+    testWidgets('Draw on this page makes it live for the phone', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            penTransportProvider.overrideWithValue(manualPen()),
+            appControllerProvider.overrideWith(
+              () => AppController(_model(connected: false)),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            home: const PageEditorScreen(notebookId: 'nb', pageId: 'page-1'),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.byTooltip('Page actions'));
+      await tester.pumpAndSettle();
+      expect(find.text('Draw on this page'), findsOneWidget);
+      await tester.tap(find.text('Draw on this page'));
+      await tester.pumpAndSettle();
+      expect(find.byType(LiveCaptureScreen), findsOneWidget);
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(LiveCaptureScreen)),
+      );
+      final model = container.read(appControllerProvider);
+      expect(model.livePageId, 'page-1');
+      expect(model.phoneDrawing, isTrue);
     });
   });
 

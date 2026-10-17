@@ -12,6 +12,7 @@ class PageRow extends StatelessWidget {
     required this.page,
     required this.onTap,
     this.live = false,
+    this.liveLabel = 'Live',
   });
 
   final NotebookPage page;
@@ -19,6 +20,9 @@ class PageRow extends StatelessWidget {
 
   /// True for the page the pen is writing into.
   final bool live;
+
+  /// The badge text: Live for the pen, Drawing for the phone.
+  final String liveLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +54,7 @@ class PageRow extends StatelessWidget {
                         vertical: PaperTokens.space4,
                       ),
                       child: Text(
-                        'Live',
+                        liveLabel,
                         style: Theme.of(context).textTheme.labelSmall
                             ?.copyWith(color: colors.onAccent),
                       ),

@@ -164,12 +164,12 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 - FR-K2 (P0). Strokes render within one frame of arrival. Pressure drives line width.
 - FR-K3 (P0). Hover shows a small cursor dot, not ink.
 - FR-K4 (P0). A page marker closes the current page and opens the next in the same notebook. An empty page is not created twice in a row.
-- FR-K5 (P0). Live page: the user assigns one page of a notebook as the live page (page menu, Set as live page). Pen ink goes to that page, the page shows a Live badge in the notebook, and tapping it opens the live view. Assigning is only possible while the pen is connected over Bluetooth. There is no separate Live page button. A pen page-button press moves the live page to the next page.
+- FR-K5 (P0). Live page: the user assigns one page of a notebook as the live page (page menu, Set as live page). Pen ink goes to that page, the page shows a Live badge in the notebook, and tapping it opens the live view. Assigning it to the pen is only possible while the pen is connected over Bluetooth. Drawing on the page from the phone has no such limit (FR-K10). There is no separate Live page button. A pen page-button press moves the live page to the next page.
 - FR-K6 (P0). Checkpoint the open stroke every 500 ms and on app pause. Recover exactly once after a crash.
 - FR-K7 (P1). Capture needs the app in the foreground. The screen stays awake while Live Capture is open. If the app is backgrounded, the open stroke is saved and the link state shows Paused. No foreground service in this release.
 - FR-K8 (P1). Undo last stroke and redo while capturing. Undo only affects the app's copy and never touches paper.
 - FR-K9 (P2). Zoom and pan the capture canvas with a minimap.
-- FR-K10 (P1). Draw on phone: Live Capture has a Notebook / Draw on phone switch. Notebook is the default and the only mode that takes pen ink. Draw on phone lets a finger or stylus draw strokes on the page, with New page and Undo stroke. The pen is paused while it is on, and the app always starts in Notebook mode. Without a connected pen the notebook screen offers Draw on phone directly.
+- FR-K10 (P1). Draw on phone is part of the live page, not a separate screen. A page is assigned from its menu: Set as live page (the pen writes into it, needs a connected pen, the default) or Draw on this page (a finger or stylus draws on it, no pen needed). The live view has a Notebook / Draw on phone switch to change the source, with Undo stroke while drawing. The pen is paused while drawing on the phone. Closing the live view ends a page that was assigned for drawing on the phone, so the pen is never left paused by accident. A page assigned to the pen keeps capturing with the pen back in charge. The badge on the page reads Live for the pen and Drawing for the phone.
 
 ### 6.5 Library and notebooks
 

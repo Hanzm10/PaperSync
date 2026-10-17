@@ -139,6 +139,9 @@ class AppController extends Notifier<AppModel> {
   bool _active = true;
   int _epoch = 0;
   bool _capturing = false;
+
+  /// True when the live page was assigned for drawing on the phone.
+  bool _phoneSession = false;
   bool _strokeOpen = false;
   bool _replaying = false;
   int _replayStrokes = 0;
@@ -486,15 +489,30 @@ class AppController extends Notifier<AppModel> {
     );
   }
 
-  /// Makes [pageId] the live page: pen ink goes to it until [clearLivePage].
-  /// Only possible while the pen is connected. Returns false otherwise.
-  bool assignLivePage(String notebookId, String pageId) {
-    if (!_active || !state.link.connected) return false;
+  /// Makes [pageId] the live page until [clearLivePage].
+  ///
+  /// By default the pen writes into it, which needs a connected pen. With
+  /// [phone] set, the live page is drawn on with a finger or stylus instead,
+  /// which needs no pen. Returns false when it cannot be done.
+  bool assignLivePage(String notebookId, String pageId, {bool phone = false}) {
+    if (!_active) return false;
+    if (!phone && !state.link.connected) return false;
     final notebook = state.notebook(notebookId);
     if (notebook == null) return false;
     if (!notebook.pages.any((page) => page.id == pageId)) return false;
-    startLive(notebookId, pageId: pageId);
+    startLive(notebookId, pageId: pageId, phoneDrawing: phone);
     return true;
+  }
+
+  /// The live view was closed. A page assigned for drawing on the phone stops
+  /// being live with it, so the pen is never left paused by accident. A page
+  /// assigned to the pen keeps capturing with the pen back in charge.
+  void leaveLiveView() {
+    if (_phoneSession) {
+      stopLive();
+    } else {
+      setPhoneDrawing(false);
+    }
   }
 
   /// Stops live capture. The page keeps its ink.
@@ -528,6 +546,7 @@ class AppController extends Notifier<AppModel> {
       hover: null,
       phoneDrawing: phoneDrawing,
     );
+    _phoneSession = phoneDrawing;
     final transport = _transport;
     if (transport is SimulatedPenTransport &&
         state.link.connected &&
@@ -627,6 +646,7 @@ class AppController extends Notifier<AppModel> {
 
   void stopLive() {
     _capturing = false;
+    _phoneSession = false;
     final transport = _transport;
     if (transport is SimulatedPenTransport) transport.stop();
     if (!_active) return;

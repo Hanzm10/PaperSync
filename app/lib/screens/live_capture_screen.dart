@@ -13,16 +13,9 @@ import '../widgets/ink_page.dart';
 import '../widgets/zoomable_sheet.dart';
 
 class LiveCaptureScreen extends ConsumerStatefulWidget {
-  const LiveCaptureScreen({
-    super.key,
-    required this.notebookId,
-    this.startInPhoneDrawing = false,
-  });
+  const LiveCaptureScreen({super.key, required this.notebookId});
 
   final String notebookId;
-
-  /// Opens in the draw-on-phone mode. The default is the notebook mode.
-  final bool startInPhoneDrawing;
 
   @override
   ConsumerState<LiveCaptureScreen> createState() => _LiveCaptureScreenState();
@@ -32,8 +25,8 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   AppController? _controller;
   int? _drawPointer;
 
-  /// True when this screen started capture itself (a draw-on-phone session).
-  /// A page the pen was assigned to keeps capturing after the screen closes.
+  /// True when this screen started capture itself. A page that was assigned as
+  /// the live page is managed by the controller, and the screen only shows it.
   bool _owns = false;
 
   @override
@@ -47,15 +40,9 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
       final model = ref.read(appControllerProvider);
       final alreadyLive =
           model.livePageId != null && model.liveNotebookId == widget.notebookId;
-      if (alreadyLive) {
-        if (widget.startInPhoneDrawing) controller.setPhoneDrawing(true);
-        return;
-      }
+      if (alreadyLive) return;
       _owns = true;
-      controller.startLive(
-        widget.notebookId,
-        phoneDrawing: widget.startInPhoneDrawing,
-      );
+      controller.startLive(widget.notebookId);
     });
   }
 
@@ -72,7 +59,7 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
           if (owns) {
             controller.stopLive();
           } else {
-            controller.setPhoneDrawing(false);
+            controller.leaveLiveView();
           }
         }),
       );

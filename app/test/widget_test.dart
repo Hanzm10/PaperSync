@@ -108,7 +108,7 @@ void main() {
     await tester.tap(find.text('Lecture notes'));
     await tester.pumpAndSettle();
     expect(find.text('Live page'), findsNothing);
-    expect(find.byKey(const Key('draw-on-phone-button')), findsOneWidget);
+    expect(find.byKey(const Key('draw-on-phone-button')), findsNothing);
 
     await tester.tap(find.textContaining('Page 3'));
     await tester.pumpAndSettle();

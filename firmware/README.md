@@ -5,7 +5,8 @@ phone (Bluetooth). It forwards the tablet's own reports unchanged, in protocol
 v3 (`docs/protocol-v3.md`).
 
 It builds with no warnings on esp32 core 3.0.7 (about 1 MB, 79% of the
-default app partition). It has not run on the board yet.
+default app partition). Verified on the board on 2026-10-18: the tablet's
+pen and buttons reach the app over Bluetooth.
 
 ## Arduino IDE settings
 

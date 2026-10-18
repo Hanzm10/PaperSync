@@ -284,7 +284,7 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                                   },
                                   child: InkPage(
                                     strokes: page.strokes,
-                                    hover: model.hover,
+                                    live: _controller?.liveInk,
                                     selectedStrokeId: drawing
                                         ? null
                                         : _selectedId,
@@ -385,7 +385,9 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
     final model = ref.read(appControllerProvider);
     final pageId = model.livePageId;
     final page = pageId == null ? null : model.page(pageId);
-    StrokePoint? point = model.hover;
+    final live = _controller?.liveInk.value;
+    StrokePoint? point =
+        live?.hover ?? (live?.writing ?? false ? live!.points.last : null);
     if (point == null && page != null) {
       for (final stroke in page.strokes.reversed) {
         if (stroke.isDeleted || stroke.points.isEmpty) continue;

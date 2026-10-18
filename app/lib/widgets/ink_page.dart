@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/ink_models.dart';
+import '../models/live_ink.dart';
 import '../paint/stroke_paint.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
@@ -17,9 +19,15 @@ class InkPage extends StatelessWidget {
     this.onPanUpdate,
     this.onPanEnd,
     this.onDraw,
+    this.live,
   });
 
   final List<Stroke> strokes;
+
+  /// The stroke being written and the hover point. They are painted on
+  /// their own layer, so a new pen point repaints only that stroke, not the
+  /// whole page.
+  final ValueListenable<LiveInk>? live;
   final StrokePoint? hover;
   final String? selectedStrokeId;
   final double strokeWidthScale;
@@ -55,7 +63,29 @@ class InkPage extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(PaperTokens.radiusCard - 1),
-        child: CustomPaint(painter: painter, child: const SizedBox.expand()),
+        child: live == null
+            ? CustomPaint(painter: painter, child: const SizedBox.expand())
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  RepaintBoundary(
+                    child: CustomPaint(
+                      painter: painter,
+                      child: const SizedBox.expand(),
+                    ),
+                  ),
+                  RepaintBoundary(
+                    child: CustomPaint(
+                      painter: LiveInkPainter(
+                        live: live!,
+                        ink: colors.ink,
+                        accent: colors.accent,
+                        strokeWidthScale: strokeWidthScale,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
       ),
     );
 
@@ -162,6 +192,57 @@ class InkSheetPainter extends CustomPainter {
     return oldDelegate.strokes != strokes ||
         oldDelegate.hover != hover ||
         oldDelegate.selectedStrokeId != selectedStrokeId ||
+        oldDelegate.ink != ink ||
+        oldDelegate.accent != accent ||
+        oldDelegate.strokeWidthScale != strokeWidthScale;
+  }
+}
+
+/// Paints the stroke being written and the hover point. It repaints when
+/// [live] changes, without a rebuild and without the rest of the page.
+class LiveInkPainter extends CustomPainter {
+  LiveInkPainter({
+    required this.live,
+    required this.ink,
+    required this.accent,
+    required this.strokeWidthScale,
+  }) : super(repaint: live);
+
+  final ValueListenable<LiveInk> live;
+  final Color ink;
+  final Color accent;
+  final double strokeWidthScale;
+
+  static final DateTime _epoch = DateTime.fromMillisecondsSinceEpoch(0);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final value = live.value;
+    if (value.writing) {
+      paintStrokes(
+        canvas,
+        size,
+        [
+          Stroke(
+            id: 'live',
+            points: value.points,
+            colorArgb: value.colorArgb,
+            createdAt: _epoch,
+          ),
+        ],
+        accent: accent,
+        widthScale: strokeWidthScale,
+        resolve: (stored) =>
+            stored.toARGB32() == AppColors.storedInk.toARGB32() ? ink : stored,
+      );
+    }
+    final hover = value.hover;
+    if (hover != null) paintHover(canvas, size, hover, accent);
+  }
+
+  @override
+  bool shouldRepaint(LiveInkPainter oldDelegate) {
+    return oldDelegate.live != live ||
         oldDelegate.ink != ink ||
         oldDelegate.accent != accent ||
         oldDelegate.strokeWidthScale != strokeWidthScale;

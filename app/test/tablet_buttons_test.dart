@@ -191,7 +191,35 @@ void main() {
       stroke(controller, 10);
       controller.drawStart(const Offset(30, 30));
       controller.undo(live().id);
+      // The open stroke joins the page when it closes, and undo left the
+      // first stroke alone.
+      expect(live().visibleStrokes, hasLength(1));
+      controller.drawEnd();
       expect(live().visibleStrokes, hasLength(2));
+    });
+
+    test('points of an open stroke do not change the app state', () {
+      final controller = container.read(appControllerProvider.notifier)
+        ..startLive('nb-one', phoneDrawing: true);
+      var updates = 0;
+      final sub = container.listen(appControllerProvider, (_, _) => updates++);
+      var liveUpdates = 0;
+      void onLive() => liveUpdates++;
+      controller.liveInk.addListener(onLive);
+      controller.drawStart(const Offset(10, 10));
+      final atOpen = updates;
+      for (var i = 0; i < 200; i++) {
+        controller.drawMove(Offset(10 + i * 0.2, 10));
+      }
+      // 200 points: the live layer hears each one, the app state none.
+      expect(updates, atOpen);
+      expect(liveUpdates, greaterThanOrEqualTo(200));
+      expect(controller.liveInk.value.points, hasLength(201));
+      controller.drawEnd();
+      expect(live().visibleStrokes.single.points, hasLength(201));
+      expect(controller.liveInk.value.writing, isFalse);
+      controller.liveInk.removeListener(onLive);
+      sub.close();
     });
 
     test('the buttons undo, redo, turn the page and change color', () async {

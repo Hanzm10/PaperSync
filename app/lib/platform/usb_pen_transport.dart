@@ -71,6 +71,12 @@ class UsbPenTransport implements PenTransport {
   int _packetsSent = 0;
   final Map<int, int> _otherIds = {};
   String _lastHex = '';
+
+  /// The last few transfers that were not pen reports and not all zeros
+  /// after the report id, newest first. Button presses land here, so they
+  /// can be read off the screen. A release is usually all zeros and is left
+  /// out so it does not hide the press.
+  final List<String> _recentOther = [];
   bool _linked = false;
 
   /// A readable snapshot of the USB link for the on-screen check. It joins
@@ -96,8 +102,9 @@ class UsbPenTransport implements PenTransport {
       'USB: ${_linked ? 'connected' : 'not connected'}, '
           '$_transfers transfers, $_penReports pen reports',
       'Pen from: ${_source ?? 'nothing yet'}',
-      'Per endpoint: ${text('perEndpoint')}',
+      'Buttons: ${_recentOther.isEmpty ? 'nothing yet' : _recentOther.join(' | ')}',
       'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
+      'Per endpoint: ${text('perEndpoint')}',
       'Pen layouts: ${layouts.isEmpty ? 'none found' : layouts.join(' | ')}',
       'Other reports: ${others.isEmpty ? 'none' : others}, '
           'dropped $droppedReports, packets $_packetsSent',
@@ -110,6 +117,11 @@ class UsbPenTransport implements PenTransport {
   }
 
   static String _hexByte(int value) => '0x${value.toRadixString(16)}';
+
+  static String _hex(int endpoint, Uint8List bytes) => [
+    _hexByte(endpoint),
+    for (final b in bytes.take(12)) b.toRadixString(16).padLeft(2, '0'),
+  ].join(' ');
 
   static int Function() _stopwatchClock() {
     final watch = Stopwatch()..start();
@@ -210,6 +222,7 @@ class UsbPenTransport implements PenTransport {
     _packetsSent = 0;
     droppedReports = 0;
     _otherIds.clear();
+    _recentOther.clear();
     _lastHex = '';
     _linked = true;
     _reportSub = host.reports.listen(_onReport, onError: (Object _) {});
@@ -258,15 +271,16 @@ class UsbPenTransport implements PenTransport {
     if (packetizer == null || profile == null || _disposed) return;
     final bytes = transfer.data;
     _transfers += 1;
-    _lastHex = [
-      _hexByte(transfer.endpoint),
-      for (final b in bytes.take(12)) b.toRadixString(16).padLeft(2, '0'),
-    ].join(' ');
+    _lastHex = _hex(transfer.endpoint, bytes);
     final reports = _penReportsFrom(transfer, profile);
     if (reports.isEmpty) {
       droppedReports += 1;
       if (bytes.isNotEmpty) {
         _otherIds[bytes[0]] = (_otherIds[bytes[0]] ?? 0) + 1;
+        if (bytes.skip(1).any((b) => b != 0)) {
+          _recentOther.insert(0, _hex(transfer.endpoint, bytes));
+          if (_recentOther.length > 3) _recentOther.removeLast();
+        }
       }
       return;
     }

@@ -185,7 +185,7 @@ In hybrid mode the ESP32 is no longer on the ink path. It is a small BLE accesso
 
 ### 6.6 Page view and editor
 
-Ink is captured, not drawn. The editor is for viewing and tidying.
+Ink is captured, not drawn. All editing happens on the live page (FR-E10). Any other page is view only (FR-E11).
 
 - FR-E1 (P0). View a page with pinch zoom, pan, and a "Page 12 of 24" header with swipe or arrows to move between pages.
 - FR-E2 (P0). Undo and redo (in memory, as already decided in `docs/decisions.md`).
@@ -196,6 +196,26 @@ Ink is captured, not drawn. The editor is for viewing and tidying.
 - FR-E7 (P1). Zoom: pages in the editor and the live view zoom with a two finger pinch, a trackpad pinch or Ctrl and the wheel, and Zoom in, Zoom out and Fit page buttons. The wheel and two finger drag pan while zoomed. One finger keeps drawing or moving strokes.
 - FR-E8 (P0). Moving a stroke keeps its shape: at the page edge the whole stroke stops, it is never flattened against the edge.
 - FR-E9 (P2). Minimap while zoomed.
+- FR-E10 (P0). The live page is the only place to edit. It has the editor's tools (color, undo and redo, select, move, erase) next to the pen. In Notebook mode the pen writes and a finger on the screen uses the chosen tool. In Draw on phone mode a Draw tool is added, so a finger can draw or edit. Undo and redo cover pen strokes as well as edits.
+- FR-E11 (P0). A page that is not live is view only: zoom and pan, export, delete, and "Set as live page". To change an old page, make it the live page first.
+
+### 6.6.1 Tablet buttons
+
+The tablet has six buttons in three rocker pairs, along the bottom when the tablet is held as the page.
+
+- FR-B1 (P0). Find out what each button sends over USB (Report ID and bytes) on a real phone, and record it in `docs/hid-t605.md`. A button that sends nothing on the phone cannot be used on the cable path.
+- FR-B2 (P0). The transport turns button reports into named button events, separate from pen samples, so the Bluetooth path can deliver the same events later.
+- FR-B3 (P0). On the live page the buttons do:
+
+| Rocker | One end | Other end |
+| --- | --- | --- |
+| 1 | Undo | Redo |
+| 2 | Zoom in | Zoom out |
+| 3 | New page | Next color |
+
+- FR-B4 (P0). Zoom in centres on the pen's last position. Zoom out steps back until the whole page fits.
+- FR-B5 (P0). Next color cycles through the editor's palette and shows a short color chip on screen.
+- FR-B6 (P0). New page does what the controller's page button does (FR-X3).
 
 ### 6.7 Search and recognition
 
@@ -434,7 +454,9 @@ Decided:
 - No background capture. The screen stays awake during capture (FR-K7).
 - Recognition is English only, on the phone. Syncing recognized text to a second device is not needed for the demo.
 - The app name and logo stay as they are.
-- The page button goes on the tablet housing. The BOOT button is the stand in until then.
+- The page button goes on the tablet housing. The BOOT button is the stand in until then. On the cable path one of the tablet's own buttons is New page (FR-B3).
+- The tablet's buttons are Undo, Redo, Zoom in, Zoom out, New page and Next color (FR-B3). There is no Previous color.
+- Only the live page edits. Other pages are view only (FR-E10, FR-E11).
 - UUIDs from `docs/protocol-v1.md` are locked.
 - Page button is `header_flags` bit 1 (FR-X3).
 - Firmware buffer is RAM only for the demo.

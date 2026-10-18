@@ -402,4 +402,13 @@ void main() {
     expect(samples, hasLength(2));
     expect(transport.droppedReports, 0);
   });
+
+  test('non pen reports show in the readout, releases left out', () async {
+    await transport.connect(_tablet.name);
+    host.send('02010000001d000000', endpoint: 0x86);
+    host.send('020000000000000000', endpoint: 0x86);
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    final lines = await transport.diagnostics();
+    expect(lines[2], 'Buttons: 0x86 02 01 00 00 00 1d 00 00 00');
+  });
 }

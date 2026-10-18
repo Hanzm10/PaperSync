@@ -340,7 +340,16 @@ class BlePenTransport implements PenTransport, ReportDescriptorSource {
       add(await characteristic.read());
       await characteristic.setNotify(true);
       await _descriptorSub?.cancel();
-      _descriptorSub = characteristic.notifications.listen(add);
+      // A notification carries only one packet's worth, so it only says the
+      // descriptor changed, such as a tablet plugged into the relay. The
+      // whole value is read again.
+      _descriptorSub = characteristic.notifications.listen((_) async {
+        try {
+          add(await characteristic.read());
+        } on Object {
+          // The link dropped. The next connection reads it again.
+        }
+      });
     } on Object {
       // Without a descriptor the relay still works for Report ID 9.
     }

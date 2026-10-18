@@ -68,6 +68,22 @@ const _hover = '0510ff07ff070000';
 
 void main() {
   group('v3 wire format', () {
+    test('decodes the test vector in docs/protocol-v3.md', () {
+      final bytes = _hex(
+        '03 00 34 12 64 00 00 00 88 13 00 00 '
+        '00 08 05 c0 ba 0a ec 09 00 00',
+      );
+      final result = decodeRelay(bytes) as RelayDecoded;
+      final n = result.notification;
+      expect(n.bootId, 0x1234);
+      expect(n.firstSeq, 100);
+      expect(n.baseTimeMs, 5000);
+      expect(n.control, isFalse);
+      expect(n.records.single.report, _hex('05c0ba0aec090000'));
+      expect(result.droppedBytes, 0);
+      expect(encodeRelay(n), bytes);
+    });
+
     test('round trips and keeps the header', () {
       final bytes = _relay(
         flags: flagReplayed | flagPageButton,

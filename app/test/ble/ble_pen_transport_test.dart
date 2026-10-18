@@ -175,6 +175,14 @@ void main() {
     addTearDown(sub.cancel);
     await transport.connect('pen-a');
     expect(seen.single, [0x05, 0x0D, 0x09, 0x02]);
+
+    // A change is announced with a short notification, and the whole value
+    // is read again.
+    final char = adapter.last!.descriptorChar!;
+    char.value = [0x05, 0x01];
+    char.controller.add(Uint8List.fromList([0x01]));
+    await _settle();
+    expect(seen.last, [0x05, 0x01]);
   });
 
   test('connects to firmware without a report descriptor', () async {
@@ -314,6 +322,7 @@ class FakeConnection implements BleConnection {
   });
 
   final List<int>? descriptor;
+  FakeChar? descriptorChar;
 
   @override
   final String remoteId;
@@ -369,7 +378,10 @@ class FakeConnection implements BleConnection {
       FakeService(strokeService, [
         stroke,
         if (layout != null)
-          FakeChar(reportDescriptorCharacteristicUuid, value: layout),
+          descriptorChar = FakeChar(
+            reportDescriptorCharacteristicUuid,
+            value: layout,
+          ),
       ]),
       FakeService(batteryServiceUuid128, [level]),
     ];
@@ -399,7 +411,7 @@ class FakeChar implements BleGattCharacteristic {
 
   @override
   final String uuid;
-  final List<int> value;
+  List<int> value;
 
   // The transport owns the lifetime; tests dispose the transport, not the char.
   // ignore: close_sinks

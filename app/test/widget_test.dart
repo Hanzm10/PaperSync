@@ -85,7 +85,10 @@ void main() {
       MaterialApp(
         theme: AppTheme.light(),
         home: Scaffold(
-          body: PageRow(page: page, onTap: () {}),
+          body: SizedBox(
+            width: 180,
+            child: PageRow(page: page, onTap: () {}),
+          ),
         ),
       ),
     );
@@ -99,6 +102,11 @@ void main() {
   testWidgets('library opens a notebook, the editor, and search', (
     tester,
   ) async {
+    // Pages are portrait now, so give the test a tall screen to fit the grid.
+    tester.view.physicalSize = const Size(800, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const ProviderScope(child: PaperSyncApp()));
     await _enterLibrary(tester);
 
@@ -107,28 +115,15 @@ void main() {
 
     await tester.tap(find.text('Lecture notes'));
     await tester.pumpAndSettle();
-    expect(find.text('Live page'), findsOneWidget);
+    expect(find.text('Live page'), findsNothing);
+    expect(find.byKey(const Key('draw-on-phone-button')), findsNothing);
 
     await tester.tap(find.textContaining('Page 3'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('history-cluster')), findsOneWidget);
-    expect(find.byKey(const Key('stroke-tools')), findsOneWidget);
-    expect(find.byKey(const Key('ink-dots')), findsOneWidget);
-    expect(find.byTooltip('Undo'), findsOneWidget);
-    expect(find.byTooltip('Redo'), findsOneWidget);
-    expect(find.byTooltip('Select'), findsOneWidget);
-    expect(find.byTooltip('Move'), findsOneWidget);
-    expect(find.byTooltip('Erase'), findsOneWidget);
-    expect(find.byTooltip('More colors'), findsOneWidget);
-    expect(find.text('Undo'), findsNothing);
-    expect(find.text('Erase'), findsNothing);
-
-    await tester.tap(find.byTooltip('More colors'));
-    await tester.pumpAndSettle();
-    expect(find.text('Ink color'), findsOneWidget);
-    expect(find.text('Use color'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
+    // A page that is not live is view only. Editing is on the live page.
+    expect(find.byKey(const Key('history-cluster')), findsNothing);
+    expect(find.byKey(const Key('stroke-tools')), findsNothing);
+    expect(find.byTooltip('Erase'), findsNothing);
 
     await tester.tap(find.byTooltip('Page actions'));
     await tester.pumpAndSettle();

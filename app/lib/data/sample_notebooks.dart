@@ -22,9 +22,9 @@ List<Notebook> sampleNotebooks() {
           createdAt: now.subtract(const Duration(days: 3)),
           recognizedText: 'mitochondria supply energy',
           lines: const [
-            (y: 28, x0: 18, x1: 148, waves: 5),
-            (y: 42, x0: 18, x1: 132, waves: 4),
-            (y: 56, x0: 18, x1: 120, waves: 3),
+            (y: 20, x0: 14, x1: 95, waves: 5),
+            (y: 55, x0: 14, x1: 85, waves: 4),
+            (y: 90, x0: 14, x1: 77, waves: 3),
           ],
         ),
         _page(
@@ -35,9 +35,9 @@ List<Notebook> sampleNotebooks() {
           recognizedText: 'kinetic friction on the ramp',
           color: AppColors.inkBlue,
           lines: const [
-            (y: 30, x0: 22, x1: 150, waves: 6),
-            (y: 46, x0: 22, x1: 110, waves: 3),
-            (y: 62, x0: 22, x1: 140, waves: 4),
+            (y: 25, x0: 14, x1: 93, waves: 6),
+            (y: 65, x0: 14, x1: 69, waves: 3),
+            (y: 105, x0: 14, x1: 87, waves: 4),
           ],
         ),
         _page(
@@ -47,8 +47,8 @@ List<Notebook> sampleNotebooks() {
           createdAt: now,
           recognizedText: 'office hours thursday',
           lines: const [
-            (y: 34, x0: 20, x1: 128, waves: 4),
-            (y: 50, x0: 20, x1: 96, waves: 2),
+            (y: 35, x0: 14, x1: 81, waves: 4),
+            (y: 75, x0: 14, x1: 61, waves: 2),
           ],
         ),
       ],
@@ -67,8 +67,8 @@ List<Notebook> sampleNotebooks() {
           recognizedText: 'supplier samples in blue',
           color: AppColors.inkRed,
           lines: const [
-            (y: 36, x0: 24, x1: 146, waves: 5),
-            (y: 54, x0: 24, x1: 100, waves: 3),
+            (y: 40, x0: 14, x1: 90, waves: 5),
+            (y: 85, x0: 14, x1: 61, waves: 3),
           ],
         ),
       ],

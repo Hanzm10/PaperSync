@@ -4,10 +4,57 @@
 /// Flutter.
 library;
 
-/// Active area of the donor tablet, in millimeters.
-const double pageWidthMm = 170;
-const double pageHeightMm = 107;
+/// Active area of the donor tablet in its own frame, in millimeters: 170
+/// across and 107 down, with the origin at its top left corner.
+const double tabletWidthMm = 170;
+const double tabletHeightMm = 107;
+
+/// A page is the tablet turned to portrait, because the notebook it sits under
+/// is portrait. So the page is 107 mm across and 170 mm tall.
+const double pageWidthMm = tabletHeightMm;
+const double pageHeightMm = tabletWidthMm;
 const double pageAspect = pageWidthMm / pageHeightMm;
+
+/// Which way the tablet is turned to make the page portrait.
+enum TabletTurn {
+  /// Turned a quarter turn clockwise. The tablet's top edge is on the right.
+  right,
+
+  /// Turned a quarter turn counterclockwise. The tablet's top edge is on the
+  /// left.
+  left;
+
+  String get label => switch (this) {
+    TabletTurn.right => 'Turned right',
+    TabletTurn.left => 'Turned left',
+  };
+
+  String get storedName => name;
+
+  static TabletTurn? fromStored(String? value) {
+    for (final turn in TabletTurn.values) {
+      if (turn.name == value) return turn;
+    }
+    return null;
+  }
+}
+
+/// Which way the tablet is turned unless the user says otherwise. The
+/// supported setup has the tablet's three buttons along the bottom, which is
+/// the tablet turned to the left.
+const TabletTurn defaultTabletTurn = TabletTurn.left;
+
+/// Moves a position from the tablet's own frame to the portrait page.
+///
+/// [xMm] runs 0 to 170 and [yMm] 0 to 107 in the tablet's frame. The result is
+/// 0 to 107 across and 0 to 170 down on the page, so the whole tablet area
+/// lands exactly on the page.
+({double x, double y}) turnTablet(double xMm, double yMm, TabletTurn turn) {
+  return switch (turn) {
+    TabletTurn.right => (x: tabletHeightMm - yMm, y: xMm),
+    TabletTurn.left => (x: yMm, y: tabletWidthMm - xMm),
+  };
+}
 
 /// Pen pressure on the wire and in stored points.
 const int maxPressure = 16383;

@@ -63,24 +63,20 @@ class NotebookPagesScreen extends ConsumerWidget {
             ),
             sliver: SliverToBoxAdapter(
               child: Row(
+                mainAxisAlignment: connected
+                    ? MainAxisAlignment.end
+                    : MainAxisAlignment.spaceBetween,
                 children: [
-                  PrimaryButton(
-                    key: const Key('live-page-button'),
-                    label: connected ? 'Live page' : 'Connect pen',
-                    onPressed: () {
-                      if (connected) {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) =>
-                                LiveCaptureScreen(notebookId: notebookId),
-                          ),
-                        );
-                      } else {
-                        _openDevice(context);
-                      }
-                    },
-                  ),
-                  const Spacer(),
+                  if (!connected) ...[
+                    Flexible(
+                      child: PrimaryButton(
+                        key: const Key('connect-pen-button'),
+                        label: 'Connect pen',
+                        onPressed: () => _openDevice(context),
+                      ),
+                    ),
+                    const SizedBox(width: PaperTokens.space12),
+                  ],
                   BarAction(
                     label: 'New page',
                     glyph: PaperGlyph.plus,
@@ -88,6 +84,28 @@ class NotebookPagesScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(
+              PaperTokens.space24,
+              0,
+              PaperTokens.space24,
+              PaperTokens.space16,
+            ),
+            sliver: SliverToBoxAdapter(
+              child: model.livePageId == null
+                  ? Text(
+                      connected
+                          ? 'Open a page and choose Set as live page to write '
+                                'into it with the pen, or Edit this page to '
+                                'edit it or draw on the phone.'
+                          : 'Open a page and choose Edit this page to edit '
+                                'it or draw on the phone.',
+                      key: const Key('live-page-hint'),
+                      style: Theme.of(context).textTheme.bodySmall,
+                    )
+                  : const SizedBox.shrink(),
             ),
           ),
           SliverPadding(
@@ -122,15 +140,20 @@ class NotebookPagesScreen extends ConsumerWidget {
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final page = pages[index];
+                    final live = model.livePageId == page.id;
                     return PageRow(
                       page: page,
+                      live: live,
+                      liveLabel: model.phoneDrawing ? 'Drawing' : 'Live',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute<void>(
-                            builder: (_) => PageEditorScreen(
-                              notebookId: notebookId,
-                              pageId: page.id,
-                            ),
+                            builder: (_) => live
+                                ? LiveCaptureScreen(notebookId: notebookId)
+                                : PageEditorScreen(
+                                    notebookId: notebookId,
+                                    pageId: page.id,
+                                  ),
                           ),
                         );
                       },

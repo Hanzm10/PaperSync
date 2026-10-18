@@ -249,7 +249,9 @@ DateTime? _optionalTime(Object? value) {
 
 double _paper(Object? value, String key, String alternate) {
   if (value is! Map) {
-    return key == 'widthMm' ? 170 : (key == 'heightMm' ? 107 : 0);
+    return key == 'widthMm'
+        ? pageWidthMm
+        : (key == 'heightMm' ? pageHeightMm : 0);
   }
   final direct = value[key];
   final fallback = value[alternate];

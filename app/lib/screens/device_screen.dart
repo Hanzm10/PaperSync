@@ -7,12 +7,15 @@ import '../format/labels.dart';
 import '../models/pen_link.dart';
 import '../state/app_controller.dart';
 import '../state/cloud.dart';
+import '../state/connection_mode.dart';
+import '../state/pen_transport_provider.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/paper_svg.dart';
+import '../widgets/usb_check.dart';
 import 'sign_in_screen.dart';
 
 class DeviceScreen extends ConsumerStatefulWidget {
@@ -33,6 +36,9 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
     final colors = context.colors;
     final signedIn = ref.watch(paperSyncAuthProvider).current != null;
     final canBackUp = ref.watch(backupReadyProvider);
+    final usb =
+        ref.watch(usbSupportedProvider) &&
+        ref.watch(connectionModeProvider) == ConnectionMode.usb;
 
     return Scaffold(
       appBar: AppTopBar(
@@ -43,10 +49,13 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
                 glyph: PaperGlyph.close,
                 onPressed: () => Navigator.of(context).pop(),
               ),
-        title: TopTitle(link.bonded ? 'Pen' : 'Pair your pen'),
+        title: TopTitle(
+          link.bonded ? 'Pen' : (usb ? 'Connect your tablet' : 'Pair your pen'),
+        ),
       ),
       body: link.bonded
           ? _Bonded(
+              usb: usb,
               link: link,
               colors: colors,
               detailsOpen: _detailsOpen,
@@ -70,6 +79,7 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
               onBackup: () => _backup(signedIn),
             )
           : _Pairing(
+              usb: usb,
               permissionGranted: link.permissionGranted,
               nearby: model.nearbyPens,
               canBackUp: canBackUp,
@@ -116,6 +126,7 @@ class _BackupAction extends StatelessWidget {
 
 class _Bonded extends StatelessWidget {
   const _Bonded({
+    required this.usb,
     required this.link,
     required this.colors,
     required this.detailsOpen,
@@ -128,6 +139,7 @@ class _Bonded extends StatelessWidget {
     required this.onBackup,
   });
 
+  final bool usb;
   final PenLink link;
   final AppColors colors;
   final bool detailsOpen;
@@ -242,6 +254,7 @@ class _Bonded extends StatelessWidget {
             ),
           ),
         ),
+        if (usb) const UsbCheck(),
       ],
     );
   }
@@ -249,6 +262,7 @@ class _Bonded extends StatelessWidget {
 
 class _Pairing extends StatelessWidget {
   const _Pairing({
+    required this.usb,
     required this.permissionGranted,
     required this.nearby,
     required this.canBackUp,
@@ -258,6 +272,7 @@ class _Pairing extends StatelessWidget {
     required this.onBackup,
   });
 
+  final bool usb;
   final bool permissionGranted;
   final List<String> nearby;
   final bool canBackUp;
@@ -281,13 +296,15 @@ class _Pairing extends StatelessWidget {
         const Center(child: PaperSvg.pen()),
         const SizedBox(height: PaperTokens.space16),
         Text(
-          'Turn on your PaperSync pen',
+          usb ? 'Plug in your tablet' : 'Turn on your PaperSync pen',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.titleMedium,
         ),
         const SizedBox(height: PaperTokens.space8),
         Text(
-          'Keep it close to this device while\nwe search nearby.',
+          usb
+              ? 'Connect the tablet to this phone with a USB\ncable. Android will ask to allow access.'
+              : 'Keep it close to this device while\nwe search nearby.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.labelMedium
               ?.copyWith(color: colors.meta),
@@ -295,7 +312,7 @@ class _Pairing extends StatelessWidget {
         const SizedBox(height: PaperTokens.space16),
         if (!permissionGranted)
           PrimaryButton(
-            label: 'Allow Bluetooth',
+            label: usb ? 'Look for the tablet' : 'Allow Bluetooth',
             expand: true,
             onPressed: onAllow,
           )
@@ -330,7 +347,7 @@ class _Pairing extends StatelessWidget {
           ],
           if (nearby.isEmpty)
             Text(
-              'No pens nearby.',
+              usb ? 'No tablet found.' : 'No pens nearby.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: colors.meta),
@@ -342,6 +359,7 @@ class _Pairing extends StatelessWidget {
               onPressed: () => onPick(nearby.first),
             ),
         ],
+        if (usb) const UsbCheck(),
       ],
     );
   }

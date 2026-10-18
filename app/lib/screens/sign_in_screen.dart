@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../state/cloud.dart';
 import '../state/ui_preferences.dart';
-import '../sync/auth.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
@@ -134,16 +133,15 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
       });
       return;
     }
-    final auth = ref.read(paperSyncAuthProvider);
-    try {
-      await auth.signInWithPassword(email: email, password: _password.text);
-    } on AuthRejected catch (error) {
+    final failure = await signInAttempt(
+      ref.read(paperSyncAuthProvider),
+      email: email,
+      password: _password.text,
+      fallback: "Those details didn't match.",
+    );
+    if (failure != null) {
       if (!mounted) return;
-      setState(() => _message = error.message);
-      return;
-    } on Object {
-      if (!mounted) return;
-      setState(() => _message = "Those details didn't match.");
+      setState(() => _message = failure);
       return;
     }
     if (!mounted) return;

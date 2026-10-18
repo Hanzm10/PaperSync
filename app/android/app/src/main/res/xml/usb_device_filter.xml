@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Lumispark T605 tablet: vendor 0x08F2, product 0x6811. -->
+<resources>
+    <usb-device vendor-id="2290" product-id="26641" />
+</resources>

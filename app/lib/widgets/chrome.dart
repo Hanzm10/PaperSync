@@ -84,6 +84,7 @@ enum PaperGlyph {
   move,
   erase,
   palette,
+  draw,
 }
 
 /// Icon control in a bar. [label] is the tooltip and accessible name.
@@ -300,6 +301,8 @@ class _PaperGlyphPainter extends CustomPainter {
         _paintErase(canvas, size, paint);
       case PaperGlyph.palette:
         _paintPalette(canvas, size, paint);
+      case PaperGlyph.draw:
+        _paintDraw(canvas, size, paint);
     }
   }
 
@@ -496,6 +499,22 @@ class _PaperGlyphPainter extends CustomPainter {
     canvas.drawLine(
       Offset(size.width * 0.34, size.height * 0.48),
       Offset(size.width * 0.66, size.height * 0.62),
+      paint,
+    );
+  }
+
+  void _paintDraw(Canvas canvas, Size size, Paint paint) {
+    final pen = Path()
+      ..moveTo(size.width * 0.24, size.height * 0.76)
+      ..lineTo(size.width * 0.30, size.height * 0.56)
+      ..lineTo(size.width * 0.66, size.height * 0.20)
+      ..lineTo(size.width * 0.80, size.height * 0.34)
+      ..lineTo(size.width * 0.44, size.height * 0.70)
+      ..close();
+    canvas.drawPath(pen, paint);
+    canvas.drawLine(
+      Offset(size.width * 0.58, size.height * 0.28),
+      Offset(size.width * 0.72, size.height * 0.42),
       paint,
     );
   }

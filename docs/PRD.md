@@ -472,7 +472,7 @@ Still open:
 
 1. Answered 2026-10-18: the ESP32-S3 works as a USB host on esp32 core 3.0.7 (not 3.3.12) with clean wiring and no hub. It gets Report ID 5, like the phone. The relay firmware (protocol v3) runs on the board and the pen and buttons reach the app over Bluetooth (verified 2026-10-18).
 2. Raw reports or pointer events for the cable path. The week 1 spike on a real phone decides (FR-U13).
-3. Battery level needs a resistor divider on the ESP32 before the Battery Service can report a real value.
+3. Battery level is skipped for this release (decided 2026-10-18): no resistor divider, so the relay sends no Battery Service and the app shows no percentage.
 
 ## 14. Acceptance tests
 

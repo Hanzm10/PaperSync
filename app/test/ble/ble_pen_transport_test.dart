@@ -164,6 +164,29 @@ void main() {
     expect(adapter.last!.strokeNotifies, 0);
     expect(statuses.whereType<Connected>(), isEmpty);
   });
+  test('reads the relay\'s report descriptor when it has one', () async {
+    final adapter = FakeAdapter()
+      ..ads = [_ad('pen-a', serviceUuid)]
+      ..descriptor = [0x05, 0x0D, 0x09, 0x02];
+    final transport = _transport(adapter);
+    addTearDown(transport.dispose);
+    final seen = <Uint8List>[];
+    final sub = transport.reportDescriptors.listen(seen.add);
+    addTearDown(sub.cancel);
+    await transport.connect('pen-a');
+    expect(seen.single, [0x05, 0x0D, 0x09, 0x02]);
+  });
+
+  test('connects to firmware without a report descriptor', () async {
+    final adapter = FakeAdapter()..ads = [_ad('pen-a', serviceUuid)];
+    final transport = _transport(adapter);
+    addTearDown(transport.dispose);
+    final statuses = <LinkStatus>[];
+    final sub = transport.status.listen(statuses.add);
+    addTearDown(sub.cancel);
+    await transport.connect('pen-a');
+    expect(statuses.last, isA<Connected>());
+  });
 }
 
 BleAdvertisement _ad(String id, String service) {
@@ -231,6 +254,7 @@ class FakeAdapter implements BleAdapter {
   bool misplacedStroke = false;
   List<int> lastBattery = const [80];
   Exception? discoverError;
+  List<int>? descriptor;
   Completer<BleConnection>? blocked;
 
   @override
@@ -255,6 +279,7 @@ class FakeAdapter implements BleAdapter {
       misplaced: misplacedStroke,
       battery: lastBattery,
       discoverError: discoverError,
+      descriptor: descriptor,
     );
     last = connection;
     return Future<BleConnection>.value(connection);
@@ -285,7 +310,10 @@ class FakeConnection implements BleConnection {
     required this.misplaced,
     required this.battery,
     this.discoverError,
+    this.descriptor,
   });
+
+  final List<int>? descriptor;
 
   @override
   final String remoteId;
@@ -336,8 +364,13 @@ class FakeConnection implements BleConnection {
     final stroke = FakeChar(strokeCharacteristicUuid);
     final level = FakeChar(batteryLevelCharacteristicUuid128, value: battery);
     _batteryChar = level;
+    final layout = descriptor;
     return [
-      FakeService(strokeService, [stroke]),
+      FakeService(strokeService, [
+        stroke,
+        if (layout != null)
+          FakeChar(reportDescriptorCharacteristicUuid, value: layout),
+      ]),
       FakeService(batteryServiceUuid128, [level]),
     ];
   }

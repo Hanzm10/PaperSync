@@ -233,6 +233,13 @@ void main() {
       expect(packets.last, v1);
       expect(buttons, [TabletButton.zoomIn]);
       expect(relay.hasLayouts, isTrue);
+
+      final lines = relay.diagnostics();
+      expect(lines[0], startsWith('Bluetooth: not connected, 2 relay'));
+      expect(lines[1], 'Pen from: 0x0 id 5');
+      expect(lines[2], contains('id 5: x 0-4095'));
+      expect(lines[3], 'Buttons: zoomIn');
+      expect(lines[5], contains('v1 1'));
       await relay.dispose();
       expect(inner.disposed, isTrue);
     });

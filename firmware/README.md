@@ -64,5 +64,14 @@ cable, powered from the MT3608 at 5 V, no hub, nothing on GPIO19 and 20.
    raise the sequence number.
 3. In the app, choose Bluetooth as the connection, pair "PaperSync Pen", open
    a live page and write. Press a tablet button to check the buttons.
+   The readout under the status line shows the relay:
+   - `Bluetooth: connected, N relay notifications, N pen samples`: the
+     counts should climb while the pen moves over the tablet.
+   - `Pen from: 0x0 id 5`: the app is reading Report ID 5.
+   - `Layouts: 484 bytes, id 5: ...`: the descriptors arrived whole. A
+     small byte count or "no pen report found" means the long read was cut.
+   - `Buttons:` the last presses, such as `undo`.
+   The Pen screen shows the same readout with two more lines: the raw bytes
+   of the last report, and counts of replayed and unreadable records.
 4. To test the buffer: write with the phone's Bluetooth off, turn it back on,
    and the strokes should arrive marked as replayed.

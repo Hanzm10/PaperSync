@@ -14,6 +14,7 @@ import '../capture/tablet_turn.dart';
 import '../data/sample_notebooks.dart';
 import '../models/ink_models.dart';
 import '../models/pen_link.dart';
+import '../platform/relay_pen_transport.dart';
 import '../platform/usb_pen_transport.dart';
 import '../protocol/codec.dart';
 import '../protocol/tablet_buttons.dart';
@@ -509,10 +510,13 @@ class AppController extends Notifier<AppModel> {
 
   /// Lines for the on-screen USB check, or null when the cable is not the
   /// connection in use.
-  Future<List<String>?> usbDiagnostics() async {
+  /// The link readout for the cable or the Bluetooth relay, or null for a
+  /// transport that has none, such as the simulator.
+  Future<List<String>?> linkDiagnostics() async {
     final transport = _transport;
-    if (transport is! UsbPenTransport) return null;
-    return transport.diagnostics();
+    if (transport is UsbPenTransport) return transport.diagnostics();
+    if (transport is RelayPenTransport) return transport.diagnostics();
+    return null;
   }
 
   /// Makes [pageId] the live page until [clearLivePage].

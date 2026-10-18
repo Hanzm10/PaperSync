@@ -4,6 +4,7 @@ import '../protocol/codec.dart';
 import '../protocol/constants.dart';
 import '../protocol/relay_codec.dart';
 import '../protocol/tablet_buttons.dart';
+import 'hid_descriptor.dart';
 import 'pen_report_reader.dart';
 import 'tablet_keys.dart';
 import 'tablet_profile.dart';
@@ -48,6 +49,20 @@ class RelayDecoder {
   /// were refused.
   int dropped = 0;
 
+  /// For the on-screen check.
+  int notifications = 0;
+  int penSamples = 0;
+  int replayedSamples = 0;
+  int controlNotifications = 0;
+  int descriptorBytes = 0;
+
+  /// The pen reports the relay's descriptors declare, such as
+  /// `id 5: x 0-4095, y 0-4095, pressure 0-2047`.
+  List<String> get layoutNames => [
+    for (final layout in _reader.layouts[source] ?? const <PenLayout>[])
+      layout.describe(),
+  ];
+
   /// The report the pen is read from, such as `0x0 id 5`.
   String? get penSource => _reader.source;
 
@@ -56,6 +71,7 @@ class RelayDecoder {
   /// Uses the report descriptors the relay sends. They come back to back in
   /// one value, and every pen report in them is found.
   void setDescriptor(Uint8List descriptor) {
+    descriptorBytes = descriptor.length;
     _reader.setDescriptor(source, descriptor);
   }
 
@@ -67,6 +83,7 @@ class RelayDecoder {
   }
 
   RelayOutput add(Uint8List bytes) {
+    notifications += 1;
     final result = decodeRelay(bytes);
     switch (result) {
       case RelayRejected():
@@ -79,6 +96,7 @@ class RelayDecoder {
   }
 
   RelayOutput _control(RelayNotification notification) {
+    controlNotifications += 1;
     return RelayOutput(
       buttons: [
         for (final record in notification.records) ..._keys.add(record.report),
@@ -137,6 +155,8 @@ class RelayDecoder {
         ),
       );
       pageNext = false;
+      penSamples += 1;
+      if (notification.replayed) replayedSamples += 1;
     }
     flush();
     _pagePending = pageNext;

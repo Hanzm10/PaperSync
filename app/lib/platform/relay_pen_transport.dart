@@ -42,28 +42,59 @@ class RelayPenTransport implements PenTransport, ButtonSource {
   StreamSubscription<Uint8List>? _descriptorSub;
   bool _disposed = false;
 
+  bool _connected = false;
+  int _v1Notifications = 0;
+  String _lastHex = '';
+  final List<String> _recentButtons = [];
+
   /// For the on-screen check: where the pen is read from, and whether the
   /// relay sent report layouts.
   String? get penSource => _decoder.penSource;
   bool get hasLayouts => _decoder.hasLayouts;
   int get dropped => _decoder.dropped;
 
+  /// A readable snapshot of the relay link for the on-screen check, the
+  /// Bluetooth counterpart of the USB check.
+  List<String> diagnostics() {
+    final layouts = _decoder.layoutNames;
+    return [
+      'Bluetooth: ${_connected ? 'connected' : 'not connected'}, '
+          '${_decoder.notifications} relay notifications, '
+          '${_decoder.penSamples} pen samples',
+      'Pen from: ${_decoder.penSource ?? 'nothing yet'}',
+      'Layouts: ${_decoder.descriptorBytes} bytes, '
+          '${layouts.isEmpty ? 'no pen report found' : layouts.join(' | ')}',
+      'Buttons: ${_recentButtons.isEmpty ? 'nothing yet' : _recentButtons.join(', ')}',
+      'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
+      'Replayed ${_decoder.replayedSamples}, unreadable ${_decoder.dropped}, '
+          'control ${_decoder.controlNotifications}, v1 $_v1Notifications',
+    ];
+  }
+
   void _onBytes(Uint8List bytes) {
     if (_disposed) return;
     if (!isRelayNotification(bytes)) {
+      _v1Notifications += 1;
       _notifications.add(bytes);
       return;
     }
+    _lastHex = [
+      for (final b in bytes.skip(12).take(12))
+        b.toRadixString(16).padLeft(2, '0'),
+    ].join(' ');
     final output = _decoder.add(bytes);
     for (final packet in output.packets) {
       _notifications.add(packet);
     }
     for (final button in output.buttons) {
+      _recentButtons.insert(0, button.name);
+      if (_recentButtons.length > 3) _recentButtons.removeLast();
       _buttons.add(button);
     }
   }
 
   void _onStatus(LinkStatus status) {
+    _connected = status is Connected;
     if (status is Disconnected || status is Connecting) _decoder.reset();
   }
 

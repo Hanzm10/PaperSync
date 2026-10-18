@@ -1,12 +1,15 @@
-/// How the tablet reaches the phone. Bluetooth is the default. USB cable
-/// exists only on Android.
+/// How the tablet reaches the app. Bluetooth is the default. USB cable
+/// exists only on Android. Demo pen, a simulated pen, exists only on the web,
+/// so the web app works without the hardware.
 enum ConnectionMode {
   bluetooth,
-  usb;
+  usb,
+  demo;
 
   String get label => switch (this) {
     ConnectionMode.bluetooth => 'Bluetooth',
     ConnectionMode.usb => 'USB cable',
+    ConnectionMode.demo => 'Demo pen',
   };
 
   String get storedName => name;

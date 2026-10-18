@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -26,7 +27,7 @@ class SettingsScreen extends ConsumerWidget {
     final prefsController = ref.read(uiPreferencesProvider.notifier);
     final link = ref.watch(appControllerProvider).link;
     final status = ref.watch(syncStatusProvider);
-    final usbSupported = ref.watch(usbSupportedProvider);
+    final choices = ref.watch(connectionChoicesProvider);
     final simulated = ref.watch(useSimulatorProvider);
     final turn = ref.watch(tabletTurnProvider);
     final mode = ref.watch(connectionModeProvider);
@@ -105,21 +106,25 @@ class SettingsScreen extends ConsumerWidget {
                     ref.read(tabletTurnProvider.notifier).select(next);
                   },
                 ),
-              if (usbSupported)
+              if (choices.length > 1)
                 SettingsTile(
                   key: const Key('connection-mode-tile'),
                   title: 'Connection',
-                  subtitle: mode == ConnectionMode.bluetooth
-                      ? 'Bluetooth is the default'
-                      : 'Tablet plugged into this phone',
+                  subtitle: switch (mode) {
+                    ConnectionMode.bluetooth =>
+                      kIsWeb
+                          ? 'The PaperSync relay, through this browser'
+                          : 'Bluetooth is the default',
+                    ConnectionMode.usb => 'Tablet plugged into this phone',
+                    ConnectionMode.demo => 'A simulated pen, no hardware',
+                  },
                   trailing: Text(
                     mode.label,
                     style: Theme.of(context).textTheme.labelMedium,
                   ),
                   onPressed: () {
-                    final next = mode == ConnectionMode.bluetooth
-                        ? ConnectionMode.usb
-                        : ConnectionMode.bluetooth;
+                    final at = choices.indexOf(mode);
+                    final next = choices[(at + 1) % choices.length];
                     ref.read(connectionModeProvider.notifier).select(next);
                   },
                 ),

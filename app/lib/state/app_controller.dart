@@ -481,6 +481,15 @@ class AppController extends Notifier<AppModel> {
     unawaited(_grant());
   }
 
+  /// Looks for pens again, such as after the browser's device picker was
+  /// closed without a choice.
+  void searchAgain() {
+    if (!_active) return;
+    unawaited(_scanSub?.cancel());
+    _scanSub = null;
+    _listenScan();
+  }
+
   void connectPen(String name) {
     if (!_active) return;
     state = state.copyWith(
@@ -716,7 +725,7 @@ class AppController extends Notifier<AppModel> {
         ..clear()
         ..addEntries([for (final pen in pens) MapEntry(pen.name, pen.id)]);
       state = state.copyWith(nearbyPens: [for (final pen in pens) pen.name]);
-    });
+    }, onError: (Object _) {});
   }
 
   void _onBytes(Uint8List bytes) {

@@ -3,7 +3,8 @@ import 'package:papersync/state/signal.dart';
 import 'package:papersync/state/transport_choice.dart';
 
 void main() {
-  test('the simulator is web, tests, or a debug phone switch', () {
+  test('the web uses Bluetooth where the browser has it', () {
+    // No Web Bluetooth (Safari, Firefox): only the demo pen.
     expect(
       shouldUseSimulator(
         isWeb: true,
@@ -13,6 +14,32 @@ void main() {
       ),
       isTrue,
     );
+    // Chrome or Edge: the real relay.
+    expect(
+      shouldUseSimulator(
+        isWeb: true,
+        isTest: false,
+        isRelease: true,
+        debugSwitch: false,
+        webBluetooth: true,
+      ),
+      isFalse,
+    );
+    // Unless the user picked the demo pen.
+    expect(
+      shouldUseSimulator(
+        isWeb: true,
+        isTest: false,
+        isRelease: true,
+        debugSwitch: false,
+        webBluetooth: true,
+        demoChosen: true,
+      ),
+      isTrue,
+    );
+  });
+
+  test('the simulator is tests or a debug phone switch', () {
     expect(
       shouldUseSimulator(
         isWeb: false,

@@ -1,12 +1,15 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 import '../ble/ble_adapter.dart';
 
 /// flutter_blue_plus binding. Policy lives in [BlePenTransport], not here.
+///
+/// On the web this is Web Bluetooth: a scan opens the browser's device
+/// picker, already filtered to the PaperSync service, and returns the one
+/// device the user picks.
 class FlutterBlueAdapter implements BleAdapter {
   FlutterBlueAdapter() {
     unawaited(FlutterBluePlus.setLogLevel(LogLevel.none, color: false));
@@ -29,18 +32,32 @@ class FlutterBlueAdapter implements BleAdapter {
     required List<String> withServices,
   }) async* {
     final collected = <String, BleAdvertisement>{};
-    final sub = FlutterBluePlus.onScanResults.listen((results) {
-      for (final result in results) {
-        final ad = _advertisement(result);
-        collected[ad.remoteId] = ad;
-      }
-    });
+    final sub = FlutterBluePlus.onScanResults.listen(
+      (results) {
+        for (final result in results) {
+          final ad = _advertisement(result, withServices);
+          collected[ad.remoteId] = ad;
+        }
+      },
+      // A failed scan arrives as an error here too. startScan reports it.
+      onError: (Object _) {},
+    );
     try {
-      await FlutterBluePlus.startScan(
-        withServices: [for (final id in withServices) Guid(id)],
-        timeout: const Duration(seconds: 4),
-        androidUsesFineLocation: false,
-      );
+      try {
+        await FlutterBluePlus.startScan(
+          withServices: [for (final id in withServices) Guid(id)],
+          // The browser blocks any service not named up front. The PaperSync
+          // service is in the filter. Battery is not.
+          webOptionalServices: [Guid('180f')],
+          timeout: const Duration(seconds: 4),
+          androidUsesFineLocation: false,
+        );
+      } on Object {
+        // The browser's picker was closed, or the radio refused. Nothing
+        // found is the answer, and the user can search again.
+        yield const [];
+        return;
+      }
       if (FlutterBluePlus.isScanningNow) {
         await FlutterBluePlus.isScanning
             .where((scanning) => !scanning)
@@ -48,7 +65,7 @@ class FlutterBlueAdapter implements BleAdapter {
             .timeout(const Duration(seconds: 6));
       }
       for (final result in FlutterBluePlus.lastScanResults) {
-        final ad = _advertisement(result);
+        final ad = _advertisement(result, withServices);
         collected[ad.remoteId] = ad;
       }
       yield collected.values.toList();
@@ -115,17 +132,21 @@ class FlutterBlueAdapter implements BleAdapter {
     }
   }
 
-  BleAdvertisement _advertisement(ScanResult result) {
+  BleAdvertisement _advertisement(ScanResult result, List<String> filter) {
     final advertised = result.advertisementData.advName;
     final name = advertised.isEmpty ? result.device.platformName : advertised;
     return BleAdvertisement(
       remoteId: result.device.remoteId.str,
       name: name,
       rssi: result.rssi,
-      serviceUuids: [
-        for (final uuid in result.advertisementData.serviceUuids)
-          uuid.str128.toLowerCase(),
-      ],
+      // The browser's picker reports no advertised services, but it only
+      // offers devices that match the filter.
+      serviceUuids: kIsWeb
+          ? [for (final id in filter) id.toLowerCase()]
+          : [
+              for (final uuid in result.advertisementData.serviceUuids)
+                uuid.str128.toLowerCase(),
+            ],
     );
   }
 }
@@ -155,8 +176,11 @@ class _BlueConnection implements BleConnection {
 
   @override
   BlePlatform get platform {
-    if (Platform.isAndroid) return BlePlatform.android;
-    if (Platform.isIOS) return BlePlatform.ios;
+    if (kIsWeb) return BlePlatform.other;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return BlePlatform.android;
+    }
+    if (defaultTargetPlatform == TargetPlatform.iOS) return BlePlatform.ios;
     return BlePlatform.other;
   }
 

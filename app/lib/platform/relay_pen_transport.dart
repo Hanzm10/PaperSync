@@ -62,9 +62,10 @@ class RelayPenTransport implements PenTransport, ButtonSource {
           '${_decoder.notifications} relay notifications, '
           '${_decoder.penSamples} pen samples',
       'Pen from: ${_decoder.penSource ?? 'nothing yet'}',
+      'Pen bits: ${_decoder.lastPenBits ?? 'nothing yet'}',
+      'Buttons: ${_recentButtons.isEmpty ? 'nothing yet' : _recentButtons.join(', ')}',
       'Layouts: ${_decoder.descriptorBytes} bytes, '
           '${layouts.isEmpty ? 'no pen report found' : layouts.join(' | ')}',
-      'Buttons: ${_recentButtons.isEmpty ? 'nothing yet' : _recentButtons.join(', ')}',
       'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
       'Replayed ${_decoder.replayedSamples}, unreadable ${_decoder.dropped}, '
           'control ${_decoder.controlNotifications}, v1 $_v1Notifications',

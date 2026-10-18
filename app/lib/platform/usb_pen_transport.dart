@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import '../ble/link_status.dart';
 import '../ble/pen_transport.dart';
 import '../protocol/tablet_buttons.dart';
+import '../usb/hid_report.dart';
 import '../usb/pen_report_reader.dart';
 import '../usb/tablet_keys.dart';
 import '../usb/tablet_profile.dart';
@@ -77,6 +78,9 @@ class UsbPenTransport implements PenTransport, ButtonSource {
   /// can be read off the screen. A release is usually all zeros and is left
   /// out so it does not hide the press.
   final List<String> _recentOther = [];
+
+  /// The first data byte of the last pen report and what it means.
+  String? _penBits;
   bool _linked = false;
 
   /// A readable snapshot of the USB link for the on-screen check. It joins
@@ -102,6 +106,7 @@ class UsbPenTransport implements PenTransport, ButtonSource {
       'USB: ${_linked ? 'connected' : 'not connected'}, '
           '$_transfers transfers, $_penReports pen reports',
       'Pen from: ${_reader?.source ?? 'nothing yet'}',
+      'Pen bits: ${_penBits ?? 'nothing yet'}',
       'Buttons: ${_recentOther.isEmpty ? 'nothing yet' : _recentOther.join(' | ')}',
       'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
       'Per endpoint: ${text('perEndpoint')}',
@@ -291,6 +296,7 @@ class UsbPenTransport implements PenTransport, ButtonSource {
       }
       return;
     }
+    if (bytes.length > 1) _penBits = penBits(bytes[1], reports.first);
     final now = _nowMs();
     for (final report in reports) {
       _penReports += 1;

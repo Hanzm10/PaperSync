@@ -269,9 +269,11 @@ void main() {
       final lines = relay.diagnostics();
       expect(lines[0], startsWith('Bluetooth: not connected, 2 relay'));
       expect(lines[1], 'Pen from: 0x0 id 5');
-      expect(lines[2], contains('id 5: x 0-4095'));
+      // The pen's first data byte: 41 is tip down, in this layout.
+      expect(lines[2], 'Pen bits: 41 = tip');
       expect(lines[3], 'Buttons: zoomIn');
-      expect(lines[5], contains('v1 1'));
+      expect(lines[4], contains('id 5: x 0-4095'));
+      expect(lines[6], contains('v1 1'));
       await relay.dispose();
       expect(inner.disposed, isTrue);
     });

@@ -410,7 +410,7 @@ void main() {
     host.send('020000000000000000', endpoint: 0x86);
     await Future<void>.delayed(const Duration(milliseconds: 10));
     final lines = await transport.diagnostics();
-    expect(lines[2], 'Buttons: 0x86 02 01 00 00 00 1d 00 00 00');
+    expect(lines[3], 'Buttons: 0x86 02 01 00 00 00 1d 00 00 00');
   });
 
   test('the tablet buttons arrive as button presses', () async {

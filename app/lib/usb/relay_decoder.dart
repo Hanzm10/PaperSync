@@ -5,6 +5,7 @@ import '../protocol/constants.dart';
 import '../protocol/relay_codec.dart';
 import '../protocol/tablet_buttons.dart';
 import 'hid_descriptor.dart';
+import 'hid_report.dart';
 import 'pen_report_reader.dart';
 import 'tablet_keys.dart';
 import 'tablet_profile.dart';
@@ -55,6 +56,10 @@ class RelayDecoder {
   int replayedSamples = 0;
   int controlNotifications = 0;
   int descriptorBytes = 0;
+
+  /// The first data byte of the last pen report and what it means, such as
+  /// `c2 = in range, barrel`. Pen buttons show up here.
+  String? lastPenBits;
 
   /// The pen reports the relay's descriptors declare, such as
   /// `id 5: x 0-4095, y 0-4095, pressure 0-2047`.
@@ -140,6 +145,9 @@ class RelayDecoder {
         if (keys.isEmpty) dropped += 1;
         buttons.addAll(keys);
         continue;
+      }
+      if (record.report.length > 1) {
+        lastPenBits = penBits(record.report[1], reports.first);
       }
       final fields = penSampleFields(reports.first, _profile);
       if (run.isEmpty) runFirst = seq;

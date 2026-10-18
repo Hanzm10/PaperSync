@@ -50,19 +50,24 @@ cable, powered from the MT3608 at 5 V, no hub, nothing on GPIO19 and 20.
 1. Flash, open the Serial Monitor, plug in the tablet. Expect:
    ```
    PaperSync relay, protocol v3
-   [ble] advertising
+   [ble] advertising as "PaperSync Pen"
    [usb] waiting for the tablet
    [usb] device 08F2:6811
-   [usb] interface 1, endpoint 84, packet 64, descriptor 228 bytes
-   [usb] interface 2, endpoint 86, packet 8, descriptor 256 bytes
+   [usb] interface 1, endpoint 84, packet 64, descriptor 200 bytes
+   [usb] interface 2, endpoint 86, packet 8, descriptor 228 bytes
    [usb] reading 2 HID interfaces
    ```
-   The descriptor sizes may differ. A size of -1 means the descriptor read
-   failed, and that line is the one to send.
+   (Measured on the board on 2026-10-18.) Two `USBH: Dev 1 EP 0 STALL`
+   lines are normal: the tablet refuses SET_IDLE. A descriptor size of -1
+   means the descriptor read failed, and that line is the one to send.
+   Hover the pen over the tablet: the first five reports print as
+   `[usb] report: 05 C0 ...`.
 2. Every 5 seconds a `[stat]` line shows the tablet, the phone, the records
    waiting and the sequence number. Moving the pen over the tablet should
    raise the sequence number.
-3. In the app, choose Bluetooth as the connection, pair "PaperSync Pen", open
+3. The relay does not show in Android's Bluetooth settings. It is a Bluetooth
+   Low Energy device that only the app connects to. In the app, set Settings,
+   Connection to Bluetooth, then connect "PaperSync Pen" from the Pen screen. Open
    a live page and write. Press a tablet button to check the buttons.
    The readout under the status line shows the relay:
    - `Bluetooth: connected, N relay notifications, N pen samples`: the

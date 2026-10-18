@@ -145,11 +145,20 @@ static void setupBle() {
   descriptorChar->addDescriptor(new BLE2902());
   service->start();
 
+  // An advertising packet holds 31 bytes. The 128 bit service id (18) and
+  // the name (15) do not fit together, so the id goes in the advertisement,
+  // which the app filters on, and the name in the scan response.
+  BLEAdvertisementData advert;
+  advert.setFlags(ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT);
+  advert.setCompleteServices(BLEUUID(SERVICE_UUID));
+  BLEAdvertisementData scanResponse;
+  scanResponse.setName(DEVICE_NAME);
   BLEAdvertising *advertising = BLEDevice::getAdvertising();
-  advertising->addServiceUUID(SERVICE_UUID);
+  advertising->setAdvertisementData(advert);
+  advertising->setScanResponseData(scanResponse);
   advertising->setScanResponse(true);
   BLEDevice::startAdvertising();
-  Serial.println("[ble] advertising");
+  Serial.printf("[ble] advertising as \"%s\"\n", DEVICE_NAME);
 }
 
 static void putHeader(uint8_t *out, uint8_t flags, uint32_t firstSeq,
@@ -547,7 +556,17 @@ void loop() {
   }
 
   Report report;
+  static uint32_t printed = 0;
   while (xQueueReceive(reportQueue, &report, 0) == pdTRUE) {
+    if (printed < 5) {
+      // The first few reports, so the Serial Monitor shows the tablet talks.
+      printed++;
+      Serial.print("[usb] report:");
+      for (int i = 0; i < report.len && i < 16; i++) {
+        Serial.printf(" %02X", report.data[i]);
+      }
+      Serial.println();
+    }
     if (isPenReport(report)) {
       storePen(report);
     } else {

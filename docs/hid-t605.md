@@ -98,6 +98,21 @@ On an Android phone (Samsung A07, USB OTG) the tablet sends no Report ID 9 at al
 - Each interrupt transfer packs two reports back to back, so a transfer is cut into reports by the size the report descriptor gives. Reading only the first drops half the points.
 - The report is already portrait, made for a phone screen: X runs across the short side and Y down the long side, with the buttons and the port along the bottom. Report ID 9 is landscape. The app turns Report ID 5 back into the landscape frame, so the default orientation (buttons along the bottom) shows it exactly as sent.
 
+### Report ID 5 corners: measured
+
+Pen tip held on each printed corner mark, tablet held as the page (buttons along the bottom):
+
+| Corner mark | X | Y |
+| --- | --- | --- |
+| Top left | 0 | 167 |
+| Top right | 4095 | 110 |
+| Bottom left | 0 | 4059 |
+| Bottom right | 4095 | 4095 |
+
+- Across, the report is already at its limits at the marks, so X uses 0 to 4095.
+- Down, the marks sit at about 139 and 4077, so Y uses that range and the strip above the top marks stays on the top edge.
+- Stored as `phoneCorners` in `lumisparkT605`.
+
 ## Buttons on a phone: measured
 
 The six buttons send Report ID 2, a keyboard report, on endpoint `0x86`. Each report is 8 bytes: id `02`, modifiers, a reserved byte, then the keys held. A transfer usually packs the press and its release back to back, for example `02 01 00 2d 00 00 00 00 | 02 00 00 00 00 00 00 00`.

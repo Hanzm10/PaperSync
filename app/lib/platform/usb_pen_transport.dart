@@ -325,7 +325,9 @@ class UsbPenTransport implements PenTransport, ButtonSource {
       final key = '${_hexByte(transfer.endpoint)} id ${layout.reportId}';
       if (_source != null && _source != key) return const [];
       _source = key;
-      return [for (final reading in readings) _scaled(reading, profile)];
+      return [
+        for (final reading in readings) _scaled(reading, layout, profile),
+      ];
     }
     return const [];
   }
@@ -338,16 +340,33 @@ class UsbPenTransport implements PenTransport, ButtonSource {
   /// landscape. So the reading is turned back into the landscape frame here,
   /// and the default orientation then gives the page exactly as the tablet
   /// sent it.
-  static PenReport _scaled(PenReading reading, TabletProfile profile) {
+  ///
+  /// When the profile has measured corners for this report, positions are
+  /// taken between those corners, so the printed marks land on the page
+  /// edges.
+  static PenReport _scaled(
+    PenReading reading,
+    PenLayout layout,
+    TabletProfile profile,
+  ) {
     int across(double unit, int min, int max) =>
         (min + unit * (max - min)).round();
+    double raw(double unit, HidField field) =>
+        field.logicalMin + unit * (field.logicalMax - field.logicalMin);
+    final corners = profile.phoneCorners;
+    final nx = corners == null
+        ? reading.x
+        : corners.x(raw(reading.x, layout.x));
+    final ny = corners == null
+        ? reading.y
+        : corners.y(raw(reading.y, layout.y));
     return PenReport(
       tip: reading.tip,
       barrel: reading.barrel,
       eraser: reading.eraser,
       inRange: reading.inRange,
-      x: across(1 - reading.y, profile.xMin, profile.xMax),
-      y: across(reading.x, profile.yMin, profile.yMax),
+      x: across(1 - ny, profile.xMin, profile.xMax),
+      y: across(nx, profile.yMin, profile.yMax),
       pressure: (reading.pressure * penMaxPressure).round(),
       tiltX: reading.tiltX.clamp(-127, 127),
       tiltY: reading.tiltY.clamp(-127, 127),

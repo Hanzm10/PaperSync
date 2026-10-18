@@ -1,3 +1,26 @@
+/// Where the printed corner marks fall in a pen report's own units, for a
+/// report other than the main one. Positions outside are kept on the edge.
+class ReportCorners {
+  const ReportCorners({
+    required this.xMin,
+    required this.xMax,
+    required this.yMin,
+    required this.yMax,
+  }) : assert(xMax > xMin, 'xMax must be above xMin'),
+       assert(yMax > yMin, 'yMax must be above yMin');
+
+  final int xMin;
+  final int xMax;
+  final int yMin;
+  final int yMax;
+
+  /// [raw] as 0 to 1 between the corners on X.
+  double x(double raw) => ((raw - xMin) / (xMax - xMin)).clamp(0.0, 1.0);
+
+  /// [raw] as 0 to 1 between the corners on Y.
+  double y(double raw) => ((raw - yMin) / (yMax - yMin)).clamp(0.0, 1.0);
+}
+
 /// What the app needs to know about one supported tablet.
 ///
 /// The corner values are the raw X and Y the tablet reports at the edges of
@@ -22,6 +45,7 @@ class TabletProfile {
     this.yMax = 32767,
     this.areaWidthMm = 170,
     this.areaHeightMm = 107,
+    this.phoneCorners,
   }) : assert(xMax > xMin, 'xMax must be above xMin'),
        assert(yMax > yMin, 'yMax must be above yMin');
 
@@ -34,6 +58,10 @@ class TabletProfile {
   final int yMax;
   final double areaWidthMm;
   final double areaHeightMm;
+
+  /// The corner marks in the report a phone gets (Report ID 5 on the T605),
+  /// in that report's units. Null uses the report's full logical range.
+  final ReportCorners? phoneCorners;
 
   bool matches(int vendor, int product) {
     return vendor == vendorId && product == productId;
@@ -67,6 +95,7 @@ class TabletProfile {
       yMax: yMax,
       areaWidthMm: areaWidthMm,
       areaHeightMm: areaHeightMm,
+      phoneCorners: phoneCorners,
     );
   }
 }
@@ -83,6 +112,10 @@ const TabletProfile lumisparkT605 = TabletProfile(
   xMax: 32759,
   yMin: 0,
   yMax: 32759,
+  // Measured on a phone with the pen tip on each printed corner mark. Across,
+  // the report already reads 0 and 4095 at the marks. Down, the marks read
+  // 110 and 167 at the top and 4059 and 4095 at the bottom.
+  phoneCorners: ReportCorners(xMin: 0, xMax: 4095, yMin: 139, yMax: 4077),
 );
 
 const List<TabletProfile> knownTablets = [lumisparkT605];

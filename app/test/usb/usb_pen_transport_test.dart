@@ -432,4 +432,30 @@ void main() {
     expect(packets, isEmpty);
     await sub.cancel();
   });
+
+  test('the printed corner marks land on the page edges', () async {
+    host.opened = [
+      UsbOpenedInterface(
+        interfaceId: 2,
+        endpoint: 0x86,
+        descriptor: _lowResDescriptor,
+      ),
+    ];
+    await transport.connect(_tablet.name);
+    // Y 139 is the top marks and 4077 the bottom marks, measured on a phone.
+    // Y 0 is above the marks and stays on the top edge.
+    host.send('0541000f8b00ff07', endpoint: 0x86);
+    host.send('0541000fed0fff07', endpoint: 0x86);
+    host.send('0541000f0000ff07', endpoint: 0x86);
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    final ys = [
+      for (final p in packets)
+        for (final s in (decode(p) as Decoded).notification.samples)
+          turnTablet(s.xMm, s.yMm, defaultTabletTurn).y,
+    ];
+    expect(ys, hasLength(3));
+    expect(ys[0], closeTo(0, 0.01));
+    expect(ys[1], closeTo(pageHeightMm, 0.01));
+    expect(ys[2], closeTo(0, 0.01));
+  });
 }

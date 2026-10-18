@@ -64,6 +64,7 @@ Header flags:
 | 0 | `0x01` | Replayed: read while no phone was listening |
 | 1 | `0x02` | Page button: a new page starts before the first record. With no records, before the next pen record |
 | 2 | `0x04` | Control: the records are not pen samples |
+| 3 | `0x08` | Bare: one report follows the header, with no `dt_ms` or length byte |
 
 ### Record
 
@@ -75,6 +76,19 @@ Header flags:
 
 A record whose length is 0, over 64, or past the end of the packet ends the
 notification. The records before it are kept.
+
+### Bare notifications
+
+A link that never raised its MTU carries 20 bytes per notification, which is
+less than a header and one record (12 + 2 + 8). Web Bluetooth has no way to
+ask for a larger MTU, so a browser can be stuck at that size. Then the
+firmware sends each report bare: the header with bit 3 set, then the report
+bytes, nothing else. The report is read at `base_time_ms` and has sequence
+number `first_seq`. Pen and control notifications can both be bare.
+
+```
+03 08 34 12 64 00 00 00 88 13 00 00 05 c0 ba 0a ec 09 00 00   20 bytes
+```
 
 ## Pen and control notifications
 

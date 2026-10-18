@@ -41,6 +41,11 @@ static const uint8_t VERSION = 3;
 static const uint8_t FLAG_REPLAYED = 0x01;
 static const uint8_t FLAG_PAGE = 0x02;
 static const uint8_t FLAG_CONTROL = 0x04;
+// One report right after the header, with no dt_ms or length byte. Used when
+// the link is too small for a record: at the default 23 byte MTU a
+// notification carries 20 bytes, exactly a header and one 8 byte report.
+// Web Bluetooth cannot ask for a larger MTU, so a browser can be stuck there.
+static const uint8_t FLAG_BARE = 0x08;
 static const int HEADER_BYTES = 12;
 static const int MAX_NOTIFICATION = 512;
 static const int MAX_REPORT = 64;
@@ -52,6 +57,10 @@ static const uint32_t SEND_EVERY_MS = 15;
 // Notifications are at least this far apart, so a buffer replay after a
 // reconnect does not overrun the Bluetooth stack's queue.
 static const uint32_t MIN_GAP_MS = 7;
+
+// With one report per notification the gap is shorter, to keep up with the
+// tablet's report rate.
+static const uint32_t MIN_GAP_BARE_MS = 3;
 
 // Pen records kept while the phone is away. In PSRAM this is about 9 minutes
 // of writing at 130 reports a second.
@@ -97,6 +106,7 @@ static BLEServer *server = nullptr;
 static BLECharacteristic *strokeChar = nullptr;
 static BLECharacteristic *descriptorChar = nullptr;
 static BLE2902 *strokeCccd = nullptr;
+static BLE2902 *descriptorCccd = nullptr;
 static volatile bool phoneConnected = false;
 static volatile uint16_t connId = 0;
 
@@ -107,10 +117,15 @@ class ServerEvents : public BLEServerCallbacks {
     Serial.println("[ble] phone connected");
   }
 
-  void onDisconnect(BLEServer *s) override {
+  void onDisconnect(BLEServer *s, esp_ble_gatts_cb_param_t *param) override {
     phoneConnected = false;
-    Serial.println("[ble] phone disconnected, advertising again");
+    Serial.printf("[ble] phone disconnected (reason 0x%02X), advertising again\n",
+                  param->disconnect.reason);
     BLEDevice::startAdvertising();
+  }
+
+  void onMtuChanged(BLEServer *s, esp_ble_gatts_cb_param_t *param) override {
+    Serial.printf("[ble] link MTU %u\n", param->mtu.mtu);
   }
 };
 
@@ -142,7 +157,8 @@ static void setupBle() {
   descriptorChar = service->createCharacteristic(
       DESCRIPTOR_UUID,
       BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY);
-  descriptorChar->addDescriptor(new BLE2902());
+  descriptorCccd = new BLE2902();
+  descriptorChar->addDescriptor(descriptorCccd);
   service->start();
 
   // An advertising packet holds 31 bytes. The 128 bit service id (18) and
@@ -225,6 +241,20 @@ static bool sendPenNotification() {
   static uint8_t out[MAX_NOTIFICATION];
   const size_t room = notifyRoom();
   const PenRecord &first = ring[ringHead];
+  if (room < HEADER_BYTES + 2 + first.len) {
+    // Too small for a record: send the first one bare.
+    if (room < HEADER_BYTES + first.len) return false;
+    uint8_t flags = FLAG_BARE;
+    if (first.offline) flags |= FLAG_REPLAYED;
+    if (first.page) flags |= FLAG_PAGE;
+    putHeader(out, flags, first.seq, first.tMs);
+    memcpy(out + HEADER_BYTES, first.data, first.len);
+    strokeChar->setValue(out, HEADER_BYTES + first.len);
+    strokeChar->notify();
+    ringHead = (ringHead + 1) % ringCapacity;
+    ringCount--;
+    return true;
+  }
   size_t used = HEADER_BYTES;
   size_t taken = 0;
   while (taken < ringCount) {
@@ -256,11 +286,20 @@ static bool sendPenNotification() {
 static void sendControl(const Report &report) {
   if (!phoneListening()) return;  // A late button press would surprise.
   uint8_t out[HEADER_BYTES + 2 + MAX_REPORT];
-  putHeader(out, FLAG_CONTROL, 0, report.tMs);
-  out[HEADER_BYTES] = 0;
-  out[HEADER_BYTES + 1] = report.len;
-  memcpy(out + HEADER_BYTES + 2, report.data, report.len);
-  strokeChar->setValue(out, HEADER_BYTES + 2 + report.len);
+  const size_t room = notifyRoom();
+  if (room >= HEADER_BYTES + 2 + report.len) {
+    putHeader(out, FLAG_CONTROL, 0, report.tMs);
+    out[HEADER_BYTES] = 0;
+    out[HEADER_BYTES + 1] = report.len;
+    memcpy(out + HEADER_BYTES + 2, report.data, report.len);
+    strokeChar->setValue(out, HEADER_BYTES + 2 + report.len);
+  } else if (room >= HEADER_BYTES + report.len) {
+    putHeader(out, FLAG_CONTROL | FLAG_BARE, 0, report.tMs);
+    memcpy(out + HEADER_BYTES, report.data, report.len);
+    strokeChar->setValue(out, HEADER_BYTES + report.len);
+  } else {
+    return;
+  }
   strokeChar->notify();
 }
 
@@ -364,9 +403,15 @@ static int controlTransfer(uint8_t requestType, uint8_t request,
 }
 
 static void publishDescriptors() {
+  // The app reads the whole value again on any notification, so one byte
+  // says it changed. The whole value would not fit a small link. The full
+  // value is back before the app's read arrives.
+  if (phoneConnected && descriptorCccd && descriptorCccd->getNotifications()) {
+    uint8_t changed = 1;
+    descriptorChar->setValue(&changed, 1);
+    descriptorChar->notify();
+  }
   descriptorChar->setValue(descriptors, descriptorLength);
-  // The app reads the whole value again on any notification.
-  if (phoneConnected) descriptorChar->notify();
 }
 
 static void openDevice(uint8_t address) {
@@ -575,7 +620,10 @@ void loop() {
   }
 
   static uint32_t lastSend = 0;
-  if (phoneListening() && ringCount > 0 && millis() - lastSend >= MIN_GAP_MS) {
+  const uint32_t gap = phoneListening() && notifyRoom() < HEADER_BYTES + 2 + 8
+                           ? MIN_GAP_BARE_MS
+                           : MIN_GAP_MS;
+  if (phoneListening() && ringCount > 0 && millis() - lastSend >= gap) {
     const PenRecord &oldest = ring[ringHead];
     const bool due = oldest.offline || ringCount >= 17 ||
                      millis() - oldest.tMs >= SEND_EVERY_MS;
@@ -585,10 +633,12 @@ void loop() {
   static uint32_t lastLog = 0;
   if (millis() - lastLog > 5000) {
     lastLog = millis();
-    Serial.printf("[stat] tablet %s, phone %s, waiting %u, seq %u, dropped %u\n",
-                  deviceOpen ? "yes" : "no",
-                  phoneListening() ? "listening" : "no", (unsigned)ringCount,
-                  (unsigned)nextSeq, (unsigned)droppedRecords);
+    Serial.printf(
+        "[stat] tablet %s, phone %s, mtu %u, waiting %u, seq %u, dropped %u\n",
+        deviceOpen ? "yes" : "no",
+        phoneListening() ? "listening" : (phoneConnected ? "connected" : "no"),
+        phoneConnected ? (unsigned)server->getPeerMTU(connId) : 0u,
+        (unsigned)ringCount, (unsigned)nextSeq, (unsigned)droppedRecords);
   }
 
   showStatus();

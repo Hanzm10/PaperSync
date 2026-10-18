@@ -63,8 +63,11 @@ cable, powered from the MT3608 at 5 V, no hub, nothing on GPIO19 and 20.
    means the descriptor read failed, and that line is the one to send.
    Hover the pen over the tablet: the first five reports print as
    `[usb] report: 05 C0 ...`.
-2. Every 5 seconds a `[stat]` line shows the tablet, the phone, the records
-   waiting and the sequence number. Moving the pen over the tablet should
+2. Every 5 seconds a `[stat]` line shows the tablet, the phone, the link MTU,
+   the records waiting and the sequence number. `[ble] link MTU` prints when
+   the phone or browser raises it, and a disconnect prints its reason code.
+   An MTU of 23 (common in browsers) is fine: reports then go one per
+   notification. Moving the pen over the tablet should
    raise the sequence number.
 3. The relay does not show in Android's Bluetooth settings. It is a Bluetooth
    Low Energy device that only the app connects to. In the app, set Settings,

@@ -120,6 +120,38 @@ void main() {
     });
   });
 
+  group('bare notifications', () {
+    test('a header and one report fit the 20 bytes of a default link', () {
+      final pen = _hex('03 08 34 12 64 00 00 00 88 13 00 00 05c0ba0aec090000');
+      expect(pen.length, 20);
+      final n = (decodeRelay(pen) as RelayDecoded).notification;
+      expect(n.bare, isTrue);
+      expect(n.firstSeq, 100);
+      expect(n.records.single.dtMs, 0);
+      expect(n.records.single.report, _hex('05c0ba0aec090000'));
+      expect(encodeRelay(n), pen);
+    });
+
+    test('bare pen and button notifications decode like full ones', () {
+      final decoder = RelayDecoder(profile: lumisparkT605)
+        ..setDescriptor(_lowResDescriptor);
+      final pen = decoder.add(
+        _relay(flags: flagBare | flagReplayed, reports: [_topRight]),
+      );
+      final sample = _samples(pen.packets).single;
+      expect(sample.touching, isTrue);
+      expect(sample.seq, 100);
+      expect(
+        (decode(pen.packets.single) as Decoded).notification.replayed,
+        isTrue,
+      );
+      final keys = decoder.add(
+        _relay(flags: flagControl | flagBare, reports: ['0201002d00000000']),
+      );
+      expect(keys.buttons, [TabletButton.undo]);
+    });
+  });
+
   group('RelayDecoder', () {
     late RelayDecoder decoder;
 

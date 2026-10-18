@@ -55,14 +55,15 @@ class UsbPacketizer {
       if (stale != null) done.add(stale);
     }
     if (_pending.isEmpty) _baseMs = nowMs;
+    final fields = penSampleFields(report, profile);
     _pending.add(
       Sample(
         seq: _nextSeq + _pending.length,
         tDeviceMs: nowMs,
-        xMm: profile.xMm(report.x),
-        yMm: profile.yMm(report.y),
-        pressure: _touching(report) ? report.pressure : 0,
-        flags: _flags(report),
+        xMm: fields.xMm,
+        yMm: fields.yMm,
+        pressure: fields.pressure,
+        flags: fields.flags,
         dtMs: nowMs - _baseMs,
       ),
     );
@@ -90,12 +91,26 @@ class UsbPacketizer {
     _pending.clear();
     return packet;
   }
+}
 
-  bool _touching(PenReport report) => report.tip && !report.eraser;
-
-  int _flags(PenReport report) {
-    if (_touching(report)) return flagTouching;
-    if (report.inRange) return flagHover;
-    return 0;
-  }
+/// The v1 sample fields for one pen report: millimetres in the tablet's own
+/// frame, pressure only while touching, and the touching or hover flag.
+///
+/// v1 has no eraser bit, so an eraser tip is sent as a hover and never
+/// draws ink.
+({double xMm, double yMm, int pressure, int flags}) penSampleFields(
+  PenReport report,
+  TabletProfile profile,
+) {
+  final touching = report.tip && !report.eraser;
+  return (
+    xMm: profile.xMm(report.x),
+    yMm: profile.yMm(report.y),
+    pressure: touching ? report.pressure : 0,
+    flags: touching
+        ? flagTouching
+        : report.inRange
+        ? flagHover
+        : 0,
+  );
 }

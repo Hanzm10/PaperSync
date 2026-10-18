@@ -90,7 +90,10 @@ Tilt read (85, -82) at one corner and (0, 0) at another while the pen was held n
 
 Active area 170 by 107 mm, centered on a 252 by 160 by 5 mm body. Hover height 15 mm. About 330 reports per second. Marketed at 5080 LPI.
 
-## Report ID 5 on a phone: measured
+## Report ID 5 on a phone and on the ESP32: measured
+
+The ESP32-S3 as USB host (esp32 core 3.0.7) sees the same thing as the phone: interface 1 on `0x84` (max packet 64) is silent, interface 2 on `0x86` (max packet 8) streams Report ID 5, for example `05 C0 BA 0A EC 09 00 00`. The phone app already reads every interface's report descriptor and sends SET_IDLE, and `0x84` stayed silent, so those two steps alone do not wake Report ID 9.
+
 
 On an Android phone (Samsung A07, USB OTG) the tablet sends no Report ID 9 at all. The pen arrives as Report ID 5 on endpoint `0x86`:
 

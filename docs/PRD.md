@@ -348,6 +348,8 @@ If the firmware owner keeps the SSOT format as written, the app can still decode
 
 The captured packet `09 c0 fe 3d 50 5c 1d 00 e3 e5` is a codec test vector for either format.
 
+**Protocol v3, the relay (decided 2026-10-18, replaces the v2 records).** The ESP32 now works as a USB host and gets exactly what the phone gets over the cable: Report ID 5 on `0x86`, nothing on `0x84`, and the buttons as keyboard keys (Report ID 2). v2's fixed Report ID 9 record does not fit that. In v3 the ESP32 forwards every report unchanged after the v1 header (boot id, sequence, time, replay and page flags), and publishes the tablet's report descriptors on a new characteristic. The app decodes the reports with the same code as the USB cable, so layouts, the portrait turn, corner calibration and the buttons live only in the app. Pen reports are numbered, buffered and replayed. Button reports go in control notifications that are never replayed. Full spec: `docs/protocol-v3.md`. Firmware: `firmware/papersync_relay/`. The app accepts v1 and v3.
+
 ### 8.2 Tablet HID (USB cable mode and firmware input)
 
 Full detail is in `docs/hid-t605.md`. Settled:
@@ -466,7 +468,7 @@ Decided:
 
 Still open:
 
-1. Whether the ESP32 can ever act as USB host. Until it can, hybrid mode is the main Android path and iOS cannot capture (R1).
+1. Answered 2026-10-18: the ESP32-S3 works as a USB host on esp32 core 3.0.7 (not 3.3.12) with clean wiring and no hub. It gets Report ID 5, like the phone. The relay firmware (protocol v3) runs on the board and the pen and buttons reach the app over Bluetooth (verified 2026-10-18).
 2. Raw reports or pointer events for the cable path. The week 1 spike on a real phone decides (FR-U13).
 3. Battery level needs a resistor divider on the ESP32 before the Battery Service can report a real value.
 

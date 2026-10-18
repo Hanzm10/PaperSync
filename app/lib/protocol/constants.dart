@@ -39,3 +39,26 @@ const int flagHover = 0x02;
 
 /// Record bit 2. The pen synthesizes this when the page button is pressed.
 const int flagPageMarker = 0x04;
+
+/// Protocol v3, the relay format: the ESP32 forwards the tablet's own HID
+/// reports unchanged. See `docs/protocol-v3.md`.
+const int relayProtocolVersion = 3;
+
+/// Bytes before each forwarded report: `dt_ms` and the report length.
+const int relayRecordHeaderBytes = 2;
+
+/// A forwarded report is never longer than one full speed packet.
+const int maxRelayReportBytes = 64;
+
+/// v3 header bit 1: a new page starts before the first record. With no
+/// records, it starts before the next pen record.
+const int flagPageButton = 0x02;
+
+/// v3 header bit 2: the records are not pen samples (the tablet's buttons).
+/// They carry no sequence numbers and are never replayed.
+const int flagControl = 0x04;
+
+/// Read and notify. The HID report descriptors of the forwarded interfaces,
+/// back to back, so the app can lay out the reports itself.
+const String reportDescriptorCharacteristicUuid =
+    '5b2e8d61-3c7a-4f19-b0d4-8e6a1f2c7d35';

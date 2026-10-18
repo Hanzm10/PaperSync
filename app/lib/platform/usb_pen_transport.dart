@@ -5,8 +5,7 @@ import 'dart:typed_data';
 import '../ble/link_status.dart';
 import '../ble/pen_transport.dart';
 import '../protocol/tablet_buttons.dart';
-import '../usb/hid_descriptor.dart';
-import '../usb/hid_report.dart';
+import '../usb/pen_report_reader.dart';
 import '../usb/tablet_keys.dart';
 import '../usb/tablet_profile.dart';
 import '../usb/usb_packetizer.dart';
@@ -53,13 +52,9 @@ class UsbPenTransport implements PenTransport, ButtonSource {
 
   StreamSubscription<UsbHostEvent>? _eventSub;
   StreamSubscription<UsbTransfer>? _reportSub;
-  TabletProfile? _profile;
 
-  /// Pen layouts from each endpoint's report descriptor.
-  Map<int, List<PenLayout>> _layouts = const {};
-
-  /// The report the pen is being read from, such as `0x86 id 5`.
-  String? _source;
+  /// Reads pen reports from the transfers of the open tablet.
+  PenReportReader? _reader;
   UsbPacketizer? _packetizer;
   Timer? _flushTimer;
   String? _openName;
@@ -99,14 +94,14 @@ class UsbPenTransport implements PenTransport, ButtonSource {
         .map((e) => '0x${e.key.toRadixString(16)} x${e.value}')
         .join(', ');
     final layouts = [
-      for (final entry in _layouts.entries)
+      for (final entry in (_reader?.layouts ?? const {}).entries)
         for (final layout in entry.value)
           '${_hexByte(entry.key)} ${layout.describe()}',
     ];
     return [
       'USB: ${_linked ? 'connected' : 'not connected'}, '
           '$_transfers transfers, $_penReports pen reports',
-      'Pen from: ${_source ?? 'nothing yet'}',
+      'Pen from: ${_reader?.source ?? 'nothing yet'}',
       'Buttons: ${_recentOther.isEmpty ? 'nothing yet' : _recentOther.join(' | ')}',
       'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
       'Per endpoint: ${text('perEndpoint')}',
@@ -212,12 +207,11 @@ class UsbPenTransport implements PenTransport, ButtonSource {
     }
     _openName = info.name;
     _pinnedKey = _keyOf(info);
-    _profile = profile;
-    _layouts = {
-      for (final iface in opened)
-        iface.endpoint: penLayoutsFrom(iface.descriptor ?? Uint8List(0)),
-    };
-    _source = null;
+    final reader = PenReportReader(profile: profile);
+    for (final iface in opened) {
+      reader.setDescriptor(iface.endpoint, iface.descriptor ?? Uint8List(0));
+    }
+    _reader = reader;
     _packetizer = UsbPacketizer(
       profile: profile,
       bootId: bootId ?? Random().nextInt(0x10000),
@@ -277,12 +271,12 @@ class UsbPenTransport implements PenTransport, ButtonSource {
 
   void _onReport(UsbTransfer transfer) {
     final packetizer = _packetizer;
-    final profile = _profile;
-    if (packetizer == null || profile == null || _disposed) return;
+    final reader = _reader;
+    if (packetizer == null || reader == null || _disposed) return;
     final bytes = transfer.data;
     _transfers += 1;
     _lastHex = _hex(transfer.endpoint, bytes);
-    final reports = _penReportsFrom(transfer, profile);
+    final reports = reader.read(transfer.endpoint, bytes);
     if (reports.isEmpty) {
       for (final button in _keys.add(bytes)) {
         _buttons.add(button);
@@ -308,69 +302,6 @@ class UsbPenTransport implements PenTransport, ButtonSource {
     if (packetizer.hasPending && _flushTimer == null) {
       _flushTimer = Timer(flushAfter, _flushNow);
     }
-  }
-
-  /// The pen reports in [transfer]: none when it holds none, or when it
-  /// comes from a source other than the one in use. Report ID 9 always takes
-  /// over.
-  List<PenReport> _penReportsFrom(UsbTransfer transfer, TabletProfile profile) {
-    final id9 = parsePenReport(transfer.data);
-    if (id9 != null) {
-      _source = '${_hexByte(transfer.endpoint)} id 9';
-      return [id9];
-    }
-    for (final layout in _layouts[transfer.endpoint] ?? const <PenLayout>[]) {
-      final readings = readPens(layout, transfer.data);
-      if (readings.isEmpty) continue;
-      final key = '${_hexByte(transfer.endpoint)} id ${layout.reportId}';
-      if (_source != null && _source != key) return const [];
-      _source = key;
-      return [
-        for (final reading in readings) _scaled(reading, layout, profile),
-      ];
-    }
-    return const [];
-  }
-
-  /// A reading in the same units and frame as Report ID 9, so the profile's
-  /// corners map it onto the whole active area.
-  ///
-  /// The other pen report is made for phones: the tablet sends it already
-  /// turned to portrait, with the buttons along the bottom. Report ID 9 is
-  /// landscape. So the reading is turned back into the landscape frame here,
-  /// and the default orientation then gives the page exactly as the tablet
-  /// sent it.
-  ///
-  /// When the profile has measured corners for this report, positions are
-  /// taken between those corners, so the printed marks land on the page
-  /// edges.
-  static PenReport _scaled(
-    PenReading reading,
-    PenLayout layout,
-    TabletProfile profile,
-  ) {
-    int across(double unit, int min, int max) =>
-        (min + unit * (max - min)).round();
-    double raw(double unit, HidField field) =>
-        field.logicalMin + unit * (field.logicalMax - field.logicalMin);
-    final corners = profile.phoneCorners;
-    final nx = corners == null
-        ? reading.x
-        : corners.x(raw(reading.x, layout.x));
-    final ny = corners == null
-        ? reading.y
-        : corners.y(raw(reading.y, layout.y));
-    return PenReport(
-      tip: reading.tip,
-      barrel: reading.barrel,
-      eraser: reading.eraser,
-      inRange: reading.inRange,
-      x: across(1 - ny, profile.xMin, profile.xMax),
-      y: across(nx, profile.yMin, profile.yMax),
-      pressure: (reading.pressure * penMaxPressure).round(),
-      tiltX: reading.tiltX.clamp(-127, 127),
-      tiltY: reading.tiltY.clamp(-127, 127),
-    );
   }
 
   void _flushNow() {
@@ -421,7 +352,7 @@ class UsbPenTransport implements PenTransport, ButtonSource {
     final packet = _packetizer?.flush();
     if (packet != null && !_disposed) _notifications.add(packet);
     _packetizer = null;
-    _profile = null;
+    _reader = null;
     await _reportSub?.cancel();
     _reportSub = null;
     if (_openName != null) {

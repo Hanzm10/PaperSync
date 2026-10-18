@@ -15,7 +15,7 @@ import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
 import '../widgets/paper_svg.dart';
-import '../widgets/usb_check.dart';
+import '../widgets/link_check.dart';
 import 'sign_in_screen.dart';
 
 class DeviceScreen extends ConsumerStatefulWidget {
@@ -254,7 +254,7 @@ class _Bonded extends StatelessWidget {
             ),
           ),
         ),
-        if (usb) const UsbCheck(),
+        const LinkCheck(),
       ],
     );
   }
@@ -359,7 +359,7 @@ class _Pairing extends StatelessWidget {
               onPressed: () => onPick(nearby.first),
             ),
         ],
-        if (usb) const UsbCheck(),
+        const LinkCheck(),
       ],
     );
   }

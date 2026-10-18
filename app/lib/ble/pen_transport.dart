@@ -49,3 +49,10 @@ abstract interface class PenTransport {
 abstract interface class ButtonSource {
   Stream<TabletButton> get buttons;
 }
+
+/// A transport that also hands over the tablet's HID report descriptors, as
+/// the relay firmware does. Each value is every forwarded interface's
+/// descriptor back to back.
+abstract interface class ReportDescriptorSource {
+  Stream<Uint8List> get reportDescriptors;
+}

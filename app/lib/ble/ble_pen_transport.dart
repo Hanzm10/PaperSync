@@ -17,7 +17,7 @@ import 'pin_store.dart';
 /// the id stored in [pins]. A stroke characteristic that is not under that
 /// service is refused. Android bonds on the first connect, asks for MTU 185,
 /// and requests high priority. iOS reads the MTU the stack already negotiated.
-class BlePenTransport implements PenTransport {
+class BlePenTransport implements PenTransport, ReportDescriptorSource {
   BlePenTransport({
     required this.adapter,
     required this.pins,
@@ -46,12 +46,15 @@ class BlePenTransport implements PenTransport {
   final StreamController<int> _battery = StreamController<int>.broadcast(
     sync: true,
   );
+  final StreamController<Uint8List> _descriptors =
+      StreamController<Uint8List>.broadcast(sync: true);
 
   final Map<String, BleAdvertisement> _seen = {};
 
   StreamSubscription<BleRadio>? _radioSub;
   StreamSubscription<Uint8List>? _strokeSub;
   StreamSubscription<Uint8List>? _batterySub;
+  StreamSubscription<Uint8List>? _descriptorSub;
   StreamSubscription<void>? _dropSub;
 
   BleConnection? _connection;
@@ -71,6 +74,10 @@ class BlePenTransport implements PenTransport {
 
   @override
   Stream<int> get battery => _battery.stream;
+
+  /// The relay firmware's report descriptors. Old firmware has none.
+  @override
+  Stream<Uint8List> get reportDescriptors => _descriptors.stream;
 
   @override
   Stream<List<FoundPen>> scan() {
@@ -145,6 +152,7 @@ class BlePenTransport implements PenTransport {
     await _close(_status);
     await _close(_notifications);
     await _close(_battery);
+    await _close(_descriptors);
   }
 
   Future<void> _loadPin() async {
@@ -244,6 +252,8 @@ class BlePenTransport implements PenTransport {
         await opened.disconnect();
         return false;
       }
+      // The descriptor first, so the first reports can already be read.
+      await _watchDescriptor(services);
       await stroke.setNotify(true);
       await _strokeSub?.cancel();
       _strokeSub = stroke.notifications.listen((bytes) {
@@ -313,6 +323,55 @@ class BlePenTransport implements PenTransport {
     });
   }
 
+  Future<void> _watchDescriptor(List<BleGattService> services) async {
+    final characteristic = _find(
+      services,
+      serviceUuid,
+      reportDescriptorCharacteristicUuid,
+    );
+    if (characteristic == null) return;
+    void add(Uint8List value) {
+      if (value.isNotEmpty && !_disposed && !_descriptors.isClosed) {
+        _descriptors.add(value);
+      }
+    }
+
+    try {
+      add(await characteristic.read());
+      await characteristic.setNotify(true);
+      await _descriptorSub?.cancel();
+      // A notification carries only one packet's worth, so it only says the
+      // descriptor changed, such as a tablet plugged into the relay. The
+      // whole value is read again.
+      _descriptorSub = characteristic.notifications.listen((_) async {
+        try {
+          add(await characteristic.read());
+        } on Object {
+          // The link dropped. The next connection reads it again.
+        }
+      });
+    } on Object {
+      // Without a descriptor the relay still works for Report ID 9.
+    }
+  }
+
+  BleGattCharacteristic? _find(
+    List<BleGattService> services,
+    String serviceId,
+    String characteristicId,
+  ) {
+    for (final service in services) {
+      if (service.uuid.toLowerCase() != serviceId.toLowerCase()) continue;
+      for (final characteristic in service.characteristics) {
+        if (characteristic.uuid.toLowerCase() ==
+            characteristicId.toLowerCase()) {
+          return characteristic;
+        }
+      }
+    }
+    return null;
+  }
+
   Future<void> _watchDrop(BleConnection connection, int epoch) async {
     await _dropSub?.cancel();
     _dropSub = connection.disconnected.listen((_) {
@@ -373,6 +432,8 @@ class BlePenTransport implements PenTransport {
     _strokeSub = null;
     await _batterySub?.cancel();
     _batterySub = null;
+    await _descriptorSub?.cancel();
+    _descriptorSub = null;
     await _dropSub?.cancel();
     _dropSub = null;
     final connection = _connection;

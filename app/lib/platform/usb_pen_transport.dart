@@ -4,8 +4,10 @@ import 'dart:typed_data';
 
 import '../ble/link_status.dart';
 import '../ble/pen_transport.dart';
+import '../protocol/tablet_buttons.dart';
 import '../usb/hid_descriptor.dart';
 import '../usb/hid_report.dart';
+import '../usb/tablet_keys.dart';
 import '../usb/tablet_profile.dart';
 import '../usb/usb_packetizer.dart';
 import 'usb_host.dart';
@@ -21,7 +23,7 @@ import 'usb_host.dart';
 /// one to use when it arrives. Any other pen report is read with the layout
 /// from that interface's own report descriptor. Only one source is used at a
 /// time, so a pen that shows up in two reports is not drawn twice.
-class UsbPenTransport implements PenTransport {
+class UsbPenTransport implements PenTransport, ButtonSource {
   UsbPenTransport({
     required this.host,
     int Function()? nowMs,
@@ -45,6 +47,9 @@ class UsbPenTransport implements PenTransport {
   final StreamController<Uint8List> _notifications =
       StreamController<Uint8List>.broadcast();
   final StreamController<int> _battery = StreamController<int>.broadcast();
+  final StreamController<TabletButton> _buttons =
+      StreamController<TabletButton>.broadcast();
+  final TabletKeyDecoder _keys = TabletKeyDecoder();
 
   StreamSubscription<UsbHostEvent>? _eventSub;
   StreamSubscription<UsbTransfer>? _reportSub;
@@ -223,6 +228,7 @@ class UsbPenTransport implements PenTransport {
     droppedReports = 0;
     _otherIds.clear();
     _recentOther.clear();
+    _keys.reset();
     _lastHex = '';
     _linked = true;
     _reportSub = host.reports.listen(_onReport, onError: (Object _) {});
@@ -248,6 +254,9 @@ class UsbPenTransport implements PenTransport {
   @override
   Stream<LinkStatus> get status => _status.stream;
 
+  @override
+  Stream<TabletButton> get buttons => _buttons.stream;
+
   /// The tablet has no battery to report.
   @override
   Stream<int> get battery => _battery.stream;
@@ -263,6 +272,7 @@ class UsbPenTransport implements PenTransport {
     await _status.close();
     await _notifications.close();
     await _battery.close();
+    await _buttons.close();
   }
 
   void _onReport(UsbTransfer transfer) {
@@ -274,6 +284,9 @@ class UsbPenTransport implements PenTransport {
     _lastHex = _hex(transfer.endpoint, bytes);
     final reports = _penReportsFrom(transfer, profile);
     if (reports.isEmpty) {
+      for (final button in _keys.add(bytes)) {
+        _buttons.add(button);
+      }
       droppedReports += 1;
       if (bytes.isNotEmpty) {
         _otherIds[bytes[0]] = (_otherIds[bytes[0]] ?? 0) + 1;

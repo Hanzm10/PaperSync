@@ -9,6 +9,7 @@ import 'package:papersync/domain/ink.dart';
 import 'package:papersync/platform/usb_host.dart';
 import 'package:papersync/platform/usb_pen_transport.dart';
 import 'package:papersync/protocol/codec.dart';
+import 'package:papersync/protocol/tablet_buttons.dart';
 
 class FakeUsbHost implements UsbHost {
   List<UsbDeviceInfo> attached = [];
@@ -410,5 +411,25 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     final lines = await transport.diagnostics();
     expect(lines[2], 'Buttons: 0x86 02 01 00 00 00 1d 00 00 00');
+  });
+
+  test('the tablet buttons arrive as button presses', () async {
+    await transport.connect(_tablet.name);
+    final presses = <TabletButton>[];
+    final sub = transport.buttons.listen(presses.add);
+    host.send(
+      '0201002d00000000'
+      '0200000000000000',
+      endpoint: 0x86,
+    );
+    host.send(
+      '0200002c00000000'
+      '0200000000000000',
+      endpoint: 0x86,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+    expect(presses, [TabletButton.undo, TabletButton.nextColor]);
+    expect(packets, isEmpty);
+    await sub.cancel();
   });
 }

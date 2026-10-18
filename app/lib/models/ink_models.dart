@@ -14,7 +14,9 @@ extension NotebookColor on Notebook {
   Color get inkColor => Color(inkColorArgb);
 }
 
-enum EditorTool { select, move, erase }
+/// What a finger on the live page does. [draw] is only offered while drawing
+/// on the phone.
+enum EditorTool { draw, select, move, erase }
 
 class PageHistory {
   const PageHistory({required this.undo, required this.redo});

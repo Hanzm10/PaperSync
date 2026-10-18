@@ -7,6 +7,20 @@ import 'package:flutter/services.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
 
+/// Zooms a [ZoomableSheet] from outside it, such as from the tablet's
+/// buttons.
+class SheetZoomController {
+  _ZoomableSheetState? _sheet;
+
+  /// One step in. [focus] is a point on the sheet as a fraction of its size,
+  /// 0 to 1 on each axis, and ends up in the middle of the view. Left out,
+  /// the middle of the view stays put.
+  void zoomIn({Offset? focus}) => _sheet?._stepIn(focus);
+
+  /// One step out, until the whole page fits.
+  void zoomOut() => _sheet?._stepOut();
+}
+
 /// Lets the user zoom into a page.
 ///
 /// Two fingers pinch and pan. A trackpad pinch or Ctrl and the mouse wheel
@@ -19,6 +33,7 @@ class ZoomableSheet extends StatefulWidget {
     required this.child,
     this.maxScale = 6,
     this.onPinchStart,
+    this.controller,
   });
 
   final Widget child;
@@ -27,6 +42,8 @@ class ZoomableSheet extends StatefulWidget {
   /// Called when a second finger lands, so a stroke begun by the first finger
   /// can be ended before the page starts to zoom.
   final VoidCallback? onPinchStart;
+
+  final SheetZoomController? controller;
 
   @override
   State<ZoomableSheet> createState() => _ZoomableSheetState();
@@ -43,6 +60,50 @@ class _ZoomableSheetState extends State<ZoomableSheet> {
   Offset _lastMid = Offset.zero;
 
   bool get _zoomed => _scale > 1.001;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller?._sheet = this;
+  }
+
+  @override
+  void didUpdateWidget(ZoomableSheet oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      if (oldWidget.controller?._sheet == this) {
+        oldWidget.controller?._sheet = null;
+      }
+      widget.controller?._sheet = this;
+    }
+  }
+
+  @override
+  void dispose() {
+    if (widget.controller?._sheet == this) widget.controller?._sheet = null;
+    super.dispose();
+  }
+
+  void _stepIn(Offset? focus) {
+    if (focus == null) {
+      _zoomBy(_step);
+      return;
+    }
+    final next = (_scale * _step).clamp(1.0, widget.maxScale).toDouble();
+    final point = Offset(
+      focus.dx.clamp(0.0, 1.0) * _size.width,
+      focus.dy.clamp(0.0, 1.0) * _size.height,
+    );
+    _apply(next, _size.center(Offset.zero) - point * next);
+  }
+
+  void _stepOut() {
+    if (_scale / _step <= 1.001) {
+      _reset();
+    } else {
+      _zoomBy(1 / _step);
+    }
+  }
 
   void _apply(double scale, Offset offset) {
     final next = scale.clamp(1.0, widget.maxScale).toDouble();

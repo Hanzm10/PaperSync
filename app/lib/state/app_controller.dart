@@ -16,6 +16,7 @@ import '../models/ink_models.dart';
 import '../models/pen_link.dart';
 import '../platform/usb_pen_transport.dart';
 import '../protocol/codec.dart';
+import '../protocol/tablet_buttons.dart';
 import '../storage/checkpoint_scheduler.dart';
 import '../storage/notebook_store.dart';
 import '../theme/app_colors.dart';
@@ -132,6 +133,12 @@ class AppController extends Notifier<AppModel> {
   CaptureMachine _machine = CaptureMachine();
   StreamSubscription<List<FoundPen>>? _scanSub;
   final Map<String, String> _ids = {};
+  final StreamController<TabletButton> _buttonPresses =
+      StreamController<TabletButton>.broadcast();
+
+  /// Every tablet button press during live capture, after the controller has
+  /// done its part. The live screen uses it to zoom and to show the color.
+  Stream<TabletButton> get tabletButtons => _buttonPresses.stream;
   final ValueNotifier<DebugInkStats> debugStats = ValueNotifier<DebugInkStats>(
     DebugInkStats.empty,
   );
@@ -182,6 +189,12 @@ class AppController extends Notifier<AppModel> {
       if (epoch != _epoch) return;
       _onBattery(level);
     });
+    final buttons = transport is ButtonSource
+        ? (transport as ButtonSource).buttons.listen((button) {
+            if (epoch != _epoch) return;
+            _onButton(button);
+          })
+        : null;
     ref.onDispose(() {
       _active = false;
       _epoch += 1;
@@ -189,6 +202,7 @@ class AppController extends Notifier<AppModel> {
       unawaited(notes.cancel());
       unawaited(status.cancel());
       unawaited(battery.cancel());
+      unawaited(buttons?.cancel());
       unawaited(_scanSub?.cancel());
       unawaited(transport.dispose());
       if (_ownsStore) unawaited(_store.close());
@@ -324,6 +338,7 @@ class AppController extends Notifier<AppModel> {
   }
 
   void undo(String pageId) {
+    if (_strokeOpen && pageId == state.livePageId) return;
     final history = state.historyFor(pageId);
     final page = state.page(pageId);
     if (page == null || !history.canUndo) return;
@@ -335,12 +350,13 @@ class AppController extends Notifier<AppModel> {
     ];
     _writePage(
       pageId,
-      page.copyWith(strokes: previous),
+      page.copyWith(strokes: _restored(page.strokes, previous)),
       PageHistory(undo: undo, redo: redo),
     );
   }
 
   void redo(String pageId) {
+    if (_strokeOpen && pageId == state.livePageId) return;
     final history = state.historyFor(pageId);
     final page = state.page(pageId);
     if (page == null || !history.canRedo) return;
@@ -352,7 +368,7 @@ class AppController extends Notifier<AppModel> {
     ];
     _writePage(
       pageId,
-      page.copyWith(strokes: next),
+      page.copyWith(strokes: _restored(page.strokes, next)),
       PageHistory(undo: undo, redo: redo),
     );
   }
@@ -796,6 +812,8 @@ class AppController extends Notifier<AppModel> {
     final page = pageId == null ? null : state.page(pageId);
     final notebook = notebookId == null ? null : state.notebook(notebookId);
     if (page == null || notebook == null) return;
+    // Each new stroke is a step that undo takes back.
+    _pushUndo(page.id);
     final stroke = Stroke(
       id: newId(),
       points: [point],
@@ -928,6 +946,53 @@ class AppController extends Notifier<AppModel> {
   DateTime _when(StrokePoint point) {
     if (point.tMs <= 0) return _clock();
     return DateTime.fromMillisecondsSinceEpoch(point.tMs);
+  }
+
+  /// The strokes of [snapshot], plus a tombstone for every stroke that is on
+  /// the page now but was not then, such as a stroke written after the
+  /// snapshot. The store keeps every stroke it was given, so a stroke that
+  /// only dropped out of the list would come back on the next start.
+  List<Stroke> _restored(List<Stroke> current, List<Stroke> snapshot) {
+    final kept = {for (final stroke in snapshot) stroke.id};
+    return [
+      ...snapshot,
+      for (final stroke in current)
+        if (!kept.contains(stroke.id))
+          stroke.isDeleted ? stroke : stroke.erased(),
+    ];
+  }
+
+  void _onButton(TabletButton button) {
+    if (!_capturing || !_active) return;
+    final pageId = state.livePageId;
+    if (pageId == null) return;
+    switch (button) {
+      case TabletButton.undo:
+        undo(pageId);
+      case TabletButton.redo:
+        redo(pageId);
+      case TabletButton.newPage:
+        newLivePage();
+      case TabletButton.nextColor:
+        _nextColor();
+      case TabletButton.zoomIn:
+      case TabletButton.zoomOut:
+        break;
+    }
+    _buttonPresses.add(button);
+  }
+
+  /// Moves the live notebook's ink to the next color of the palette. A color
+  /// from outside the palette goes to the first one.
+  void _nextColor() {
+    final notebookId = state.liveNotebookId;
+    final notebook = notebookId == null ? null : state.notebook(notebookId);
+    if (notebook == null) return;
+    const palette = AppColors.palette;
+    final at = palette.indexWhere(
+      (color) => color.toARGB32() == notebook.inkColorArgb,
+    );
+    setInkColor(notebook.id, palette[(at + 1) % palette.length]);
   }
 
   void _pushUndo(String pageId) {

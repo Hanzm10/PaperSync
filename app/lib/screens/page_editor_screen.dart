@@ -5,13 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../export/page_export.dart';
 import '../models/ink_models.dart';
-import '../paint/stroke_paint.dart';
 import '../state/app_controller.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
 import '../widgets/chrome.dart';
 import '../widgets/dialogs.dart';
-import '../widgets/editor_bar.dart';
 import '../widgets/ink_page.dart';
 import '../widgets/zoomable_sheet.dart';
 import 'live_capture_screen.dart';
@@ -30,11 +28,9 @@ class PageEditorScreen extends ConsumerStatefulWidget {
   ConsumerState<PageEditorScreen> createState() => _PageEditorScreenState();
 }
 
+/// A page that is not live is only viewed here. Editing happens on the live
+/// page, so "Edit this page" makes this page live for the phone.
 class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
-  EditorTool _tool = EditorTool.select;
-  String? _selectedId;
-  String? _lastErasedId;
-
   @override
   Widget build(BuildContext context) {
     final model = ref.watch(appControllerProvider);
@@ -44,7 +40,6 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
     if (notebook == null || page == null) {
       return const Scaffold(body: SizedBox.shrink());
     }
-    final history = model.historyFor(page.id);
     final isLive = model.livePageId == page.id;
 
     return Scaffold(
@@ -67,10 +62,7 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
               ),
             ),
             if (!isLive)
-              const PopupMenuItem(
-                value: 'draw',
-                child: Text('Draw on this page'),
-              ),
+              const PopupMenuItem(value: 'draw', child: Text('Edit this page')),
             const PopupMenuItem(value: 'pdf', child: Text('Export PDF')),
             const PopupMenuItem(value: 'image', child: Text('Export image')),
             PopupMenuItem(
@@ -102,18 +94,7 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
                       child: AspectRatio(
                         aspectRatio: pageAspect,
                         child: ZoomableSheet(
-                          child: InkPage(
-                            strokes: page.strokes,
-                            selectedStrokeId: _selectedId,
-                            onTapDown: (mm) => _tap(controller, page, mm),
-                            onPanStart: (mm) => _panStart(controller, page, mm),
-                            onPanUpdate: (mm, delta) =>
-                                _panUpdate(controller, page, mm, delta),
-                            onPanEnd: () {
-                              controller.disarmHistory();
-                              _lastErasedId = null;
-                            },
-                          ),
+                          child: InkPage(strokes: page.strokes),
                         ),
                       ),
                     ),
@@ -122,83 +103,9 @@ class _PageEditorScreenState extends ConsumerState<PageEditorScreen> {
               ),
             ),
           ),
-          EditorBar(
-            tool: _tool,
-            inkColor: notebook.inkColor,
-            canUndo: history.canUndo,
-            canRedo: history.canRedo,
-            onTool: (tool) => setState(() => _tool = tool),
-            onUndo: history.canUndo
-                ? () {
-                    controller.undo(page.id);
-                    setState(() => _selectedId = null);
-                  }
-                : null,
-            onRedo: history.canRedo
-                ? () {
-                    controller.redo(page.id);
-                    setState(() => _selectedId = null);
-                  }
-                : null,
-            onColor: (color) {
-              controller.setInkColor(notebook.id, color);
-              final selected = _selectedId;
-              if (selected != null) {
-                controller.recolorStroke(page.id, selected, color);
-              }
-            },
-          ),
         ],
       ),
     );
-  }
-
-  void _tap(AppController controller, NotebookPage page, Offset mm) {
-    final id = hitStroke(page.strokes, mm);
-    if (_tool == EditorTool.erase) {
-      if (id != null) controller.eraseStroke(page.id, id);
-      setState(() => _selectedId = null);
-      return;
-    }
-    setState(() => _selectedId = id);
-  }
-
-  void _panStart(AppController controller, NotebookPage page, Offset mm) {
-    final id = _selectedId ?? hitStroke(page.strokes, mm);
-    if (_tool == EditorTool.erase) {
-      if (id != null) {
-        controller.eraseStroke(page.id, id);
-        _lastErasedId = id;
-      }
-      return;
-    }
-    if (_tool == EditorTool.move && id != null) {
-      controller.armHistory(page.id);
-      setState(() => _selectedId = id);
-      return;
-    }
-    setState(() => _selectedId = id);
-  }
-
-  void _panUpdate(
-    AppController controller,
-    NotebookPage page,
-    Offset mm,
-    Offset delta,
-  ) {
-    if (_tool == EditorTool.move && _selectedId != null) {
-      controller.moveStroke(page.id, _selectedId!, delta);
-      return;
-    }
-    if (_tool == EditorTool.erase) {
-      final current = ref.read(appControllerProvider).page(page.id);
-      if (current == null) return;
-      final id = hitStroke(current.strokes, mm);
-      if (id != null && id != _lastErasedId) {
-        controller.eraseStroke(page.id, id);
-        _lastErasedId = id;
-      }
-    }
   }
 
   Future<void> _onMenu(

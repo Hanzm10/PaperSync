@@ -203,15 +203,15 @@ Ink is captured, not drawn. All editing happens on the live page (FR-E10). Any o
 
 The tablet has six buttons in three rocker pairs, along the bottom when the tablet is held as the page.
 
-- FR-B1 (P0). Find out what each button sends over USB (Report ID and bytes) on a real phone, and record it in `docs/hid-t605.md`. A button that sends nothing on the phone cannot be used on the cable path.
+- FR-B1 (P0). Find out what each button sends over USB (Report ID and bytes) on a real phone, and record it in `docs/hid-t605.md`. Done: all six send keyboard keys in Report ID 2 on `0x86`.
 - FR-B2 (P0). The transport turns button reports into named button events, separate from pen samples, so the Bluetooth path can deliver the same events later.
 - FR-B3 (P0). On the live page the buttons do:
 
-| Rocker | One end | Other end |
+| Rocker (left is beside the port) | Top | Bottom |
 | --- | --- | --- |
-| 1 | Undo | Redo |
-| 2 | Zoom in | Zoom out |
-| 3 | New page | Next color |
+| Left | Redo | Undo |
+| Middle | Zoom in | Zoom out |
+| Right | Next color | New page |
 
 - FR-B4 (P0). Zoom in centres on the pen's last position. Zoom out steps back until the whole page fits.
 - FR-B5 (P0). Next color cycles through the editor's palette and shows a short color chip on screen.

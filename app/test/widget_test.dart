@@ -120,24 +120,10 @@ void main() {
 
     await tester.tap(find.textContaining('Page 3'));
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('history-cluster')), findsOneWidget);
-    expect(find.byKey(const Key('stroke-tools')), findsOneWidget);
-    expect(find.byKey(const Key('ink-dots')), findsOneWidget);
-    expect(find.byTooltip('Undo'), findsOneWidget);
-    expect(find.byTooltip('Redo'), findsOneWidget);
-    expect(find.byTooltip('Select'), findsOneWidget);
-    expect(find.byTooltip('Move'), findsOneWidget);
-    expect(find.byTooltip('Erase'), findsOneWidget);
-    expect(find.byTooltip('More colors'), findsOneWidget);
-    expect(find.text('Undo'), findsNothing);
-    expect(find.text('Erase'), findsNothing);
-
-    await tester.tap(find.byTooltip('More colors'));
-    await tester.pumpAndSettle();
-    expect(find.text('Ink color'), findsOneWidget);
-    expect(find.text('Use color'), findsOneWidget);
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
+    // A page that is not live is view only. Editing is on the live page.
+    expect(find.byKey(const Key('history-cluster')), findsNothing);
+    expect(find.byKey(const Key('stroke-tools')), findsNothing);
+    expect(find.byTooltip('Erase'), findsNothing);
 
     await tester.tap(find.byTooltip('Page actions'));
     await tester.pumpAndSettle();

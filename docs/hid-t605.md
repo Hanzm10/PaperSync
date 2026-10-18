@@ -97,3 +97,20 @@ On an Android phone (Samsung A07, USB OTG) the tablet sends no Report ID 9 at al
 - 8 bytes per report: id `05`, flags, X (16 bit), Y (16 bit), pressure (16 bit). Example: `05 c0 ff 0f 02 00 00 00`.
 - Each interrupt transfer packs two reports back to back, so a transfer is cut into reports by the size the report descriptor gives. Reading only the first drops half the points.
 - The report is already portrait, made for a phone screen: X runs across the short side and Y down the long side, with the buttons and the port along the bottom. Report ID 9 is landscape. The app turns Report ID 5 back into the landscape frame, so the default orientation (buttons along the bottom) shows it exactly as sent.
+
+## Buttons on a phone: measured
+
+The six buttons send Report ID 2, a keyboard report, on endpoint `0x86`. Each report is 8 bytes: id `02`, modifiers, a reserved byte, then the keys held. A transfer usually packs the press and its release back to back, for example `02 01 00 2d 00 00 00 00 | 02 00 00 00 00 00 00 00`.
+
+With the tablet held as the page (buttons along the bottom), the left rocker is beside the port:
+
+| Rocker | End | Sends | App action |
+| --- | --- | --- | --- |
+| Left | top | Ctrl and `=` (`0x2E`) | Redo |
+| Left | bottom | Ctrl and `-` (`0x2D`) | Undo |
+| Middle | top | `]` (`0x30`) | Zoom in |
+| Middle | bottom | `[` (`0x2F`) | Zoom out |
+| Right | top | Space (`0x2C`) | Next color |
+| Right | bottom | Tab (`0x2B`) | New page |
+
+The app reads only the key code, never the modifier. A press is a key that was not held in the report before, so holding a button counts once. The mapping lives in `t605Keys` in `app/lib/usb/tablet_keys.dart`.

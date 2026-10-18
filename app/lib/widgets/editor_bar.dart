@@ -30,9 +30,13 @@ class EditorBar extends StatelessWidget {
     required this.onUndo,
     required this.onRedo,
     required this.onColor,
+    this.showDraw = false,
   });
 
   final EditorTool tool;
+
+  /// Offers the Draw tool, for drawing on the phone with a finger.
+  final bool showDraw;
   final Color inkColor;
   final bool canUndo;
   final bool canRedo;
@@ -88,6 +92,13 @@ class EditorBar extends StatelessWidget {
                   _Cluster(
                     key: const Key('stroke-tools'),
                     children: [
+                      if (showDraw)
+                        _ToolButton(
+                          label: 'Draw',
+                          glyph: PaperGlyph.draw,
+                          selected: tool == EditorTool.draw,
+                          onPressed: () => onTool(EditorTool.draw),
+                        ),
                       _ToolButton(
                         label: 'Select',
                         glyph: PaperGlyph.select,

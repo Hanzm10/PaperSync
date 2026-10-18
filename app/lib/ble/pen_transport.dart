@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../protocol/tablet_buttons.dart';
 import 'link_status.dart';
 
 /// A pen the scan has seen.
@@ -41,4 +42,10 @@ abstract interface class PenTransport {
   Stream<int> get battery;
 
   Future<void> dispose();
+}
+
+/// A transport that also reports the tablet's buttons. Only the cable path
+/// does today.
+abstract interface class ButtonSource {
+  Stream<TabletButton> get buttons;
 }

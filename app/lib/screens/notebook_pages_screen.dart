@@ -98,10 +98,10 @@ class NotebookPagesScreen extends ConsumerWidget {
                   ? Text(
                       connected
                           ? 'Open a page and choose Set as live page to write '
-                                'into it with the pen, or Draw on this page to '
-                                'draw on the phone.'
-                          : 'Open a page and choose Draw on this page to draw '
-                                'on the phone.',
+                                'into it with the pen, or Edit this page to '
+                                'edit it or draw on the phone.'
+                          : 'Open a page and choose Edit this page to edit '
+                                'it or draw on the phone.',
                       key: const Key('live-page-hint'),
                       style: Theme.of(context).textTheme.bodySmall,
                     )

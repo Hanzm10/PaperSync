@@ -198,7 +198,7 @@ void main() {
       await pump(tester, _model(connected: false));
       expect(find.byKey(const Key('connect-pen-button')), findsOneWidget);
       expect(find.byKey(const Key('live-page-hint')), findsOneWidget);
-      expect(find.textContaining('Draw on this page'), findsOneWidget);
+      expect(find.textContaining('Edit this page'), findsOneWidget);
       expect(find.textContaining('Set as live page'), findsNothing);
     });
 
@@ -217,9 +217,7 @@ void main() {
   });
 
   group('page menu', () {
-    testWidgets('Draw on this page makes it live for the phone', (
-      tester,
-    ) async {
+    testWidgets('Edit this page makes it live for the phone', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -237,8 +235,8 @@ void main() {
       await tester.pump();
       await tester.tap(find.byTooltip('Page actions'));
       await tester.pumpAndSettle();
-      expect(find.text('Draw on this page'), findsOneWidget);
-      await tester.tap(find.text('Draw on this page'));
+      expect(find.text('Edit this page'), findsOneWidget);
+      await tester.tap(find.text('Edit this page'));
       await tester.pumpAndSettle();
       expect(find.byType(LiveCaptureScreen), findsOneWidget);
       final container = ProviderScope.containerOf(

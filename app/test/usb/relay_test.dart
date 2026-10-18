@@ -185,6 +185,16 @@ void main() {
       expect(decoder.penSource, '0x0 id 5');
     });
 
+    test('unknown keys show in the readout with no name', () {
+      decoder.add(
+        _relay(
+          flags: flagControl,
+          reports: ['0200001400000000', '0200000000000000'],
+        ),
+      );
+      expect(decoder.recentControl, ['02 00 00 14 00 00 00 00']);
+    });
+
     test('control notifications are the tablet\'s buttons', () {
       final out = decoder.add(
         _relay(
@@ -271,7 +281,7 @@ void main() {
       expect(lines[1], 'Pen from: 0x0 id 5');
       // The pen's first data byte: 41 is tip down, in this layout.
       expect(lines[2], 'Pen bits: 41 = tip');
-      expect(lines[3], 'Buttons: zoomIn');
+      expect(lines[3], 'Buttons: 02 00 00 30 00 00 00 00 = zoomIn');
       expect(lines[4], contains('id 5: x 0-4095'));
       expect(lines[6], contains('v1 1'));
       await relay.dispose();

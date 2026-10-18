@@ -45,7 +45,6 @@ class RelayPenTransport implements PenTransport, ButtonSource {
   bool _connected = false;
   int _v1Notifications = 0;
   String _lastHex = '';
-  final List<String> _recentButtons = [];
 
   /// For the on-screen check: where the pen is read from, and whether the
   /// relay sent report layouts.
@@ -63,7 +62,7 @@ class RelayPenTransport implements PenTransport, ButtonSource {
           '${_decoder.penSamples} pen samples',
       'Pen from: ${_decoder.penSource ?? 'nothing yet'}',
       'Pen bits: ${_decoder.lastPenBits ?? 'nothing yet'}',
-      'Buttons: ${_recentButtons.isEmpty ? 'nothing yet' : _recentButtons.join(', ')}',
+      'Buttons: ${_decoder.recentControl.isEmpty ? 'nothing yet' : _decoder.recentControl.join(' | ')}',
       'Layouts: ${_decoder.descriptorBytes} bytes, '
           '${layouts.isEmpty ? 'no pen report found' : layouts.join(' | ')}',
       'Last: ${_lastHex.isEmpty ? 'nothing yet' : _lastHex}',
@@ -88,8 +87,6 @@ class RelayPenTransport implements PenTransport, ButtonSource {
       _notifications.add(packet);
     }
     for (final button in output.buttons) {
-      _recentButtons.insert(0, button.name);
-      if (_recentButtons.length > 3) _recentButtons.removeLast();
       _buttons.add(button);
     }
   }

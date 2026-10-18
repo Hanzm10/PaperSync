@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:papersync/ble/pen_transport.dart';
 import 'package:papersync/ble/simulated_pen_transport.dart';
 import 'package:papersync/models/ink_models.dart';
 import 'package:papersync/models/pen_link.dart';
+import 'package:papersync/protocol/codec.dart';
+import 'package:papersync/protocol/constants.dart';
 import 'package:papersync/protocol/tablet_buttons.dart';
 import 'package:papersync/screens/live_capture_screen.dart';
 import 'package:papersync/state/app_controller.dart';
@@ -39,8 +41,47 @@ class _ButtonPen extends SimulatedPenTransport implements ButtonSource {
   final StreamController<TabletButton> presses =
       StreamController<TabletButton>.broadcast();
 
+  /// Pen notifications a test sends, in place of the simulator's own.
+  // Closed by each test.
+  // ignore: close_sinks
+  final StreamController<Uint8List> notes =
+      StreamController<Uint8List>.broadcast(sync: true);
+
   @override
   Stream<TabletButton> get buttons => presses.stream;
+
+  @override
+  Stream<Uint8List> get notifications => notes.stream;
+}
+
+/// One v1 notification of pen samples at tablet millimetres, all touching
+/// or all lifted.
+Uint8List _penNote(
+  int firstSeq,
+  List<(double, double)> points, {
+  bool touch = true,
+}) {
+  return encode(
+    Notification(
+      version: 1,
+      headerFlags: 0,
+      bootId: 9,
+      firstSeq: firstSeq,
+      baseTimeMs: 1000 + firstSeq * 10,
+      samples: [
+        for (var i = 0; i < points.length; i++)
+          Sample(
+            seq: firstSeq + i,
+            tDeviceMs: 1000 + firstSeq * 10 + i,
+            xMm: points[i].$1,
+            yMm: points[i].$2,
+            pressure: touch ? 4000 : 0,
+            flags: touch ? flagTouching : flagHover,
+            dtMs: i,
+          ),
+      ],
+    ),
+  );
 }
 
 void main() {
@@ -66,6 +107,19 @@ void main() {
       expect(decoder.add(_hex('0201002d00000000')), [TabletButton.undo]);
       expect(decoder.add(_hex('0201002d00000000')), isEmpty);
       expect(decoder.add(_hex('0200000000000000')), isEmpty);
+      expect(decoder.add(_hex('0201002d00000000')), [TabletButton.undo]);
+    });
+
+    test('the pen buttons: minus erases while held, plus is next color', () {
+      final decoder = TabletKeyDecoder();
+      // Captured on the phone: minus is Ctrl and Z, plus is Ctrl, Shift
+      // and Z.
+      expect(decoder.add(_hex('0201001d00000000')), [TabletButton.eraseStart]);
+      expect(decoder.add(_hex('0201001d00000000')), isEmpty);
+      expect(decoder.add(_hex('0200000000000000')), [TabletButton.eraseEnd]);
+      expect(decoder.add(_hex('0203001d00000000')), [TabletButton.nextColor]);
+      expect(decoder.add(_hex('0200000000000000')), isEmpty);
+      // The tablet's own undo, Ctrl and minus, is unchanged.
       expect(decoder.add(_hex('0201002d00000000')), [TabletButton.undo]);
     });
 
@@ -96,6 +150,7 @@ void main() {
     tearDown(() async {
       container.dispose();
       await pen.presses.close();
+      await pen.notes.close();
     });
 
     NotebookPage live() {
@@ -177,6 +232,34 @@ void main() {
       await sub.cancel();
     });
 
+    test('the pen erase button turns pen touches into erasing', () async {
+      final controller = container.read(appControllerProvider.notifier)
+        ..startLive('nb-one');
+      final seen = <TabletButton>[];
+      final sub = controller.tabletButtons.listen(seen.add);
+      // A pen stroke across the tablet, then the pen lifts.
+      pen.notes.add(_penNote(0, [(40, 40), (60, 50), (80, 60)]));
+      pen.notes.add(_penNote(3, [(80, 60)], touch: false));
+      expect(live().visibleStrokes, hasLength(1));
+
+      pen.presses.add(TabletButton.eraseStart);
+      await Future<void>.delayed(Duration.zero);
+      expect(seen, [TabletButton.eraseStart]);
+      // Touching the stroke again erases it and draws nothing.
+      pen.notes.add(_penNote(4, [(60, 50), (61, 50)]));
+      pen.notes.add(_penNote(6, [(61, 50)], touch: false));
+      expect(live().visibleStrokes, isEmpty);
+
+      pen.presses.add(TabletButton.eraseEnd);
+      await Future<void>.delayed(Duration.zero);
+      expect(seen.last, TabletButton.eraseEnd);
+      // Writing again draws.
+      pen.notes.add(_penNote(7, [(20, 20), (30, 30)]));
+      pen.notes.add(_penNote(9, [(30, 30)], touch: false));
+      expect(live().visibleStrokes, hasLength(1));
+      await sub.cancel();
+    });
+
     test('the buttons do nothing without a live page', () async {
       final controller = container.read(appControllerProvider.notifier);
       final seen = <TabletButton>[];
@@ -226,6 +309,16 @@ void main() {
     expect(find.text('Blue ink'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1300));
     expect(find.byKey(const Key('ink-flash')), findsNothing);
+
+    // The pen's erase button shows a chip while held.
+    pen.presses.add(TabletButton.eraseStart);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('pen-eraser')), findsOneWidget);
+    pen.presses.add(TabletButton.eraseEnd);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('pen-eraser')), findsNothing);
 
     // Leaving stops capture after the frame, so let that run.
     await tester.pumpWidget(const SizedBox.shrink());

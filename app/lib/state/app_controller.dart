@@ -14,6 +14,7 @@ import '../capture/tablet_turn.dart';
 import '../data/sample_notebooks.dart';
 import '../models/ink_models.dart';
 import '../models/pen_link.dart';
+import '../paint/stroke_paint.dart';
 import '../platform/relay_pen_transport.dart';
 import '../platform/usb_pen_transport.dart';
 import '../protocol/codec.dart';
@@ -153,6 +154,10 @@ class AppController extends Notifier<AppModel> {
   /// True when the live page was assigned for drawing on the phone.
   bool _phoneSession = false;
   bool _strokeOpen = false;
+
+  /// The pen's erase button is held: its touches erase strokes instead of
+  /// drawing.
+  bool _penErasing = false;
   bool _replaying = false;
   int _replayStrokes = 0;
   int _seqGaps = 0;
@@ -685,6 +690,7 @@ class AppController extends Notifier<AppModel> {
 
   void stopLive() {
     _capturing = false;
+    if (_active) _setPenErasing(false);
     _phoneSession = false;
     final transport = _transport;
     if (transport is SimulatedPenTransport) transport.stop();
@@ -756,6 +762,8 @@ class AppController extends Notifier<AppModel> {
   void _onStatus(LinkStatus status) {
     if (!_active) return;
     _linkStatus = status;
+    // A link that drops cannot report the erase button coming back up.
+    if (status is! Connected) _setPenErasing(false);
     final dropped = switch (status) {
       Disconnected() || Unavailable() => true,
       Connecting() || Connected() || Reconnecting() => false,
@@ -779,19 +787,29 @@ class AppController extends Notifier<AppModel> {
     if (!_active) return;
     switch (event) {
       case StrokeOpened(:final point):
-        _openStroke(point);
-        if (_replaying) {
-          _replayStrokes += 1;
-          _paintLink(saved: false);
+        if (_penErasing && !state.phoneDrawing) {
+          _eraseAt(point);
+        } else {
+          _openStroke(point);
+          if (_replaying) {
+            _replayStrokes += 1;
+            _paintLink(saved: false);
+          }
         }
       case PointAdded(:final point):
-        _addPoint(point);
+        if (_penErasing && !state.phoneDrawing) {
+          _eraseAt(point);
+        } else {
+          _addPoint(point);
+        }
       case StrokeClosed():
         final pageId = state.livePageId;
         final page = pageId == null ? null : state.page(pageId);
+        final wasOpen = _strokeOpen;
         _strokeOpen = false;
         _checkpoints.stop();
-        if (page != null && page.strokes.isNotEmpty) {
+        // An erasing touch opened no stroke, so there is nothing to save.
+        if (wasOpen && page != null && page.strokes.isNotEmpty) {
           _persist(_store.saveClosedStroke(page.id, page.strokes.last));
         }
       case HoverMoved(:final point):
@@ -976,10 +994,23 @@ class AppController extends Notifier<AppModel> {
   }
 
   void _onButton(TabletButton button) {
-    if (!_capturing || !_active) return;
+    if (!_active) return;
+    if (button == TabletButton.eraseEnd) {
+      // Always let go, so the pen cannot stay stuck erasing.
+      _setPenErasing(false);
+      return;
+    }
+    if (!_capturing) return;
     final pageId = state.livePageId;
     if (pageId == null) return;
     switch (button) {
+      case TabletButton.eraseStart:
+        // A stroke being written when the button goes down ends there.
+        if (_strokeOpen && !state.phoneDrawing) _apply(const StrokeClosed());
+        _setPenErasing(true);
+        return;
+      case TabletButton.eraseEnd:
+        return;
       case TabletButton.undo:
         undo(pageId);
       case TabletButton.redo:
@@ -993,6 +1024,23 @@ class AppController extends Notifier<AppModel> {
         break;
     }
     _buttonPresses.add(button);
+  }
+
+  void _setPenErasing(bool on) {
+    if (_penErasing == on) return;
+    _penErasing = on;
+    _buttonPresses.add(on ? TabletButton.eraseStart : TabletButton.eraseEnd);
+  }
+
+  /// Erases the stroke under a touching pen point, while the erase button
+  /// is held.
+  void _eraseAt(StrokePoint point) {
+    if (!point.touching) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null) return;
+    final id = hitStroke(page.strokes, Offset(point.xMm, point.yMm));
+    if (id != null) eraseStroke(page.id, id);
   }
 
   /// Moves the live notebook's ink to the next color of the palette. A color

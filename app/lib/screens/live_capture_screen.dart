@@ -47,6 +47,9 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   Color? _flashColor;
   Timer? _flashTimer;
 
+  /// The pen's erase button is held.
+  bool _penErasing = false;
+
   @override
   void initState() {
     super.initState();
@@ -303,7 +306,14 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                                 ),
                               ),
                             ),
-                            if (flash != null)
+                            if (_penErasing)
+                              const Positioned(
+                                top: PaperTokens.space12,
+                                left: 0,
+                                right: 0,
+                                child: Center(child: _EraserChip()),
+                              )
+                            else if (flash != null)
                               Positioned(
                                 top: PaperTokens.space12,
                                 left: 0,
@@ -339,6 +349,10 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
         _zoom.zoomOut();
       case TabletButton.nextColor:
         _flash();
+      case TabletButton.eraseStart:
+        setState(() => _penErasing = true);
+      case TabletButton.eraseEnd:
+        setState(() => _penErasing = false);
       case TabletButton.undo:
       case TabletButton.redo:
       case TabletButton.newPage:
@@ -545,6 +559,38 @@ class _ColorChip extends StatelessWidget {
               _colorName(color),
               style: Theme.of(context).textTheme.labelMedium,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown while the pen's erase button is held.
+class _EraserChip extends StatelessWidget {
+  const _EraserChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return DecoratedBox(
+      key: const Key('pen-eraser'),
+      decoration: BoxDecoration(
+        color: colors.page.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
+        border: Border.all(color: colors.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: PaperTokens.space12,
+          vertical: PaperTokens.space8,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PaperGlyphIcon(PaperGlyph.erase),
+            const SizedBox(width: PaperTokens.space8),
+            Text('Eraser', style: Theme.of(context).textTheme.labelMedium),
           ],
         ),
       ),

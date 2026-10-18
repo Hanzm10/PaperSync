@@ -216,6 +216,7 @@ The tablet has six buttons in three rocker pairs, along the bottom when the tabl
 - FR-B4 (P0). Zoom in centres on the pen's last position. Zoom out steps back until the whole page fits.
 - FR-B5 (P0). Next color cycles through the editor's palette and shows a short color chip on screen.
 - FR-B6 (P0). New page does what the controller's page button does (FR-X3).
+- FR-B7 (P1). The pen's two buttons: − erases while held (the pen tip erases the strokes it touches, and an Eraser chip shows), + is next color. They send Ctrl and Z, and Ctrl, Shift and Z, as keyboard reports on the same endpoint as the tablet's buttons. In Draw on phone mode they do not change what a finger does.
 
 ### 6.7 Search and recognition
 

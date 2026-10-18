@@ -1,15 +1,21 @@
-/// Simulator on the web and in tests. Phones use Bluetooth.
+/// Whether the simulated pen is used. Tests always simulate.
 ///
-/// A debug switch can select the simulator on a phone. A release build
-/// ignores that switch, so it cannot reach the simulator. Web release
-/// still simulates, because a browser has no pen radio.
+/// On the web, a browser with Web Bluetooth (Chrome and Edge) talks to the
+/// real relay unless the user picked the demo pen. A browser without it
+/// can only simulate.
+///
+/// On a phone, a debug switch can select the simulator. A release build
+/// ignores that switch, so it cannot reach the simulator.
 bool shouldUseSimulator({
   required bool isWeb,
   required bool isTest,
   required bool isRelease,
   required bool debugSwitch,
+  bool webBluetooth = false,
+  bool demoChosen = false,
 }) {
-  if (isWeb || isTest) return true;
+  if (isTest) return true;
+  if (isWeb) return !webBluetooth || demoChosen;
   if (isRelease) return false;
   return debugSwitch;
 }

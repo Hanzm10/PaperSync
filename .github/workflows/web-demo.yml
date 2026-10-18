@@ -1,7 +1,9 @@
 name: Web demo
 
-# Builds the Flutter web demo (simulated pen) and publishes it
-# to GitHub Pages. In the repo settings, set Pages > Source to "GitHub Actions".
+# Builds the Flutter web app and publishes it to GitHub Pages. In Chrome and
+# Edge it connects to the ESP32 relay over Web Bluetooth. Other browsers, and
+# anyone who picks it in Settings, get the demo pen.
+# In the repo settings, set Pages > Source to "GitHub Actions".
 # Cloud backup turns on when SUPABASE_URL (variable or secret) and the
 # SUPABASE_ANON_KEY secret exist. Only the anon key may be used here.
 on:

@@ -22,6 +22,9 @@ PenTransport createBleTransport() {
   );
 }
 
+/// Web Bluetooth is a browser API.
+bool get webBluetoothSupported => false;
+
 /// Only Android has a USB host API the app can use for the tablet.
 bool get usbSupported => Platform.isAndroid;
 

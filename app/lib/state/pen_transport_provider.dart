@@ -26,19 +26,52 @@ final captureClockProvider = Provider<DateTime Function()>((ref) {
   return DateTime.now;
 });
 
-final useSimulatorProvider = Provider<bool>((ref) {
+/// The simulator regardless of the chosen connection: tests, and the debug
+/// switch on a phone. Kept apart from [useSimulatorProvider] so the
+/// connection mode can depend on it without a loop.
+final _forcedSimulatorProvider = Provider<bool>((ref) {
   return shouldUseSimulator(
-    isWeb: kIsWeb,
+    isWeb: false,
     isTest: isFlutterTest,
     isRelease: kReleaseMode,
     debugSwitch: ref.watch(debugSimulatorSwitchProvider),
   );
 });
 
+/// True in a browser that can reach the Bluetooth relay (Chrome and Edge).
+final webBluetoothProvider = Provider<bool>((ref) {
+  return kIsWeb && !isFlutterTest && platform.webBluetoothSupported;
+});
+
+final useSimulatorProvider = Provider<bool>((ref) {
+  return shouldUseSimulator(
+    isWeb: kIsWeb,
+    isTest: isFlutterTest,
+    isRelease: kReleaseMode,
+    debugSwitch: ref.watch(debugSimulatorSwitchProvider),
+    webBluetooth: ref.watch(webBluetoothProvider),
+    demoChosen: ref.watch(connectionModeProvider) == ConnectionMode.demo,
+  );
+});
+
 /// True on an Android phone, where the tablet can be plugged in with a USB
-/// cable. False on iOS, on the web, and while the simulator is in use.
+/// cable. False on iOS, on the web, and while the simulator is forced.
 final usbSupportedProvider = Provider<bool>((ref) {
-  return !ref.watch(useSimulatorProvider) && platform.usbSupported;
+  return !ref.watch(_forcedSimulatorProvider) && platform.usbSupported;
+});
+
+/// The connections this device offers, in the order the setting cycles.
+final connectionChoicesProvider = Provider<List<ConnectionMode>>((ref) {
+  if (kIsWeb) {
+    return [
+      if (ref.watch(webBluetoothProvider)) ConnectionMode.bluetooth,
+      ConnectionMode.demo,
+    ];
+  }
+  return [
+    ConnectionMode.bluetooth,
+    if (ref.watch(usbSupportedProvider)) ConnectionMode.usb,
+  ];
 });
 
 final connectionModeStoreProvider = Provider<ConnectionModeStore>((ref) {
@@ -50,7 +83,8 @@ final connectionModeProvider =
       ConnectionModeController.new,
     );
 
-/// Bluetooth until the user picks USB cable, and only where USB exists.
+/// Bluetooth until the user picks another connection this device offers.
+/// A browser without Web Bluetooth starts on the demo pen.
 class ConnectionModeController extends Notifier<ConnectionMode> {
   bool _alive = true;
 
@@ -58,20 +92,20 @@ class ConnectionModeController extends Notifier<ConnectionMode> {
   ConnectionMode build() {
     _alive = true;
     ref.onDispose(() => _alive = false);
-    if (ref.watch(usbSupportedProvider)) {
-      unawaited(_load());
-    }
-    return ConnectionMode.bluetooth;
+    final choices = ref.watch(connectionChoicesProvider);
+    if (choices.length > 1) unawaited(_load());
+    return choices.first;
   }
 
   Future<void> _load() async {
     final saved = await ref.read(connectionModeStoreProvider).read();
     if (!_alive || saved == null || saved == state) return;
+    if (!ref.read(connectionChoicesProvider).contains(saved)) return;
     state = saved;
   }
 
   void select(ConnectionMode mode) {
-    if (mode == ConnectionMode.usb && !ref.read(usbSupportedProvider)) return;
+    if (!ref.read(connectionChoicesProvider).contains(mode)) return;
     if (mode == state) return;
     state = mode;
     unawaited(ref.read(connectionModeStoreProvider).write(mode));

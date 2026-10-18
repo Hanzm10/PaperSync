@@ -85,6 +85,7 @@ class _DeviceScreenState extends ConsumerState<DeviceScreen> {
               canBackUp: canBackUp,
               signedIn: signedIn,
               onAllow: controller.grantPermission,
+              onSearchAgain: controller.searchAgain,
               onPick: (name) {
                 controller.connectPen(name);
                 Navigator.of(context).popUntil((route) => route.isFirst);
@@ -270,8 +271,10 @@ class _Pairing extends StatelessWidget {
     required this.onAllow,
     required this.onPick,
     required this.onBackup,
+    required this.onSearchAgain,
   });
 
+  final VoidCallback onSearchAgain;
   final bool usb;
   final bool permissionGranted;
   final List<String> nearby;
@@ -345,14 +348,23 @@ class _Pairing extends StatelessWidget {
             ),
             const SizedBox(height: PaperTokens.space16),
           ],
-          if (nearby.isEmpty)
+          if (nearby.isEmpty) ...[
             Text(
               usb ? 'No tablet found.' : 'No pens nearby.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: colors.meta),
-            )
-          else
+            ),
+            if (!usb) ...[
+              const SizedBox(height: PaperTokens.space16),
+              PrimaryButton(
+                key: const Key('search-again'),
+                label: 'Search again',
+                expand: true,
+                onPressed: onSearchAgain,
+              ),
+            ],
+          ] else
             PrimaryButton(
               label: 'Connect',
               expand: true,

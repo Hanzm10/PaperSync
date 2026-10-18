@@ -50,6 +50,8 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   /// The pen's erase button is held.
   bool _penErasing = false;
 
+  bool _pickerOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -353,11 +355,28 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
         setState(() => _penErasing = true);
       case TabletButton.eraseEnd:
         setState(() => _penErasing = false);
+      case TabletButton.pickColor:
+        unawaited(_pickColor());
       case TabletButton.undo:
       case TabletButton.redo:
-      case TabletButton.newPage:
+      case TabletButton.nextPage:
+      case TabletButton.previousPage:
         setState(() => _selectedId = null);
     }
+  }
+
+  /// Opens the ink color picker from the pen's double press. A second double
+  /// press while it is open does nothing.
+  Future<void> _pickColor() async {
+    if (_pickerOpen) return;
+    final model = ref.read(appControllerProvider);
+    final notebook = model.notebook(widget.notebookId);
+    if (notebook == null) return;
+    _pickerOpen = true;
+    final color = await showInkColorPicker(context, initial: notebook.inkColor);
+    _pickerOpen = false;
+    if (color == null || !mounted) return;
+    _controller?.setInkColor(notebook.id, color);
   }
 
   /// Where the pen is or last wrote, as a fraction of the page. Null when

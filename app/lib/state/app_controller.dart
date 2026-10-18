@@ -205,6 +205,7 @@ class AppController extends Notifier<AppModel> {
       _active = false;
       _epoch += 1;
       _checkpoints.stop();
+      _colorTimer?.cancel();
       unawaited(notes.cancel());
       unawaited(status.cancel());
       unawaited(battery.cancel());
@@ -664,6 +665,45 @@ class AppController extends Notifier<AppModel> {
     }
   }
 
+  /// The live notebook's pages in order, deleted ones left out.
+  List<NotebookPage> _livePages() {
+    final notebookId = state.liveNotebookId;
+    final notebook = notebookId == null ? null : state.notebook(notebookId);
+    if (notebook == null) return const [];
+    return [
+      for (final page in notebook.pages)
+        if (!page.isDeleted) page,
+    ]..sort((a, b) => a.pageIndex.compareTo(b.pageIndex));
+  }
+
+  /// Moves the live page to the next page, or starts a new one after the
+  /// last page.
+  void nextLivePage() {
+    if (!_capturing) return;
+    final pages = _livePages();
+    final at = pages.indexWhere((page) => page.id == state.livePageId);
+    if (at < 0 || at == pages.length - 1) {
+      newLivePage();
+      return;
+    }
+    _showLivePage(pages[at + 1].id);
+  }
+
+  /// Moves the live page back one page. Nothing happens on the first page.
+  void previousLivePage() {
+    if (!_capturing) return;
+    final pages = _livePages();
+    final at = pages.indexWhere((page) => page.id == state.livePageId);
+    if (at <= 0) return;
+    _showLivePage(pages[at - 1].id);
+  }
+
+  void _showLivePage(String pageId) {
+    if (_strokeOpen) _apply(const StrokeClosed());
+    state = state.copyWith(livePageId: pageId, hover: null);
+    _resetMachine();
+  }
+
   /// Starts the next page of the live notebook, as the pen's page button does.
   void newLivePage() {
     if (!_capturing) return;
@@ -1015,15 +1055,41 @@ class AppController extends Notifier<AppModel> {
         undo(pageId);
       case TabletButton.redo:
         redo(pageId);
-      case TabletButton.newPage:
-        newLivePage();
+      case TabletButton.nextPage:
+        nextLivePage();
+      case TabletButton.previousPage:
+        previousLivePage();
       case TabletButton.nextColor:
-        _nextColor();
+        _colorPress();
+        return;
+      case TabletButton.pickColor:
       case TabletButton.zoomIn:
       case TabletButton.zoomOut:
         break;
     }
     _buttonPresses.add(button);
+  }
+
+  /// A second press this soon after the first is a double press.
+  static const Duration doublePress = Duration(milliseconds: 350);
+  Timer? _colorTimer;
+
+  /// One press of the color button is the next color, two quick presses
+  /// open the picker. The single press waits out [doublePress] so a double
+  /// press does not also change the color.
+  void _colorPress() {
+    if (_colorTimer?.isActive ?? false) {
+      _colorTimer!.cancel();
+      _colorTimer = null;
+      _buttonPresses.add(TabletButton.pickColor);
+      return;
+    }
+    _colorTimer = Timer(doublePress, () {
+      _colorTimer = null;
+      if (!_active || !_capturing) return;
+      _nextColor();
+      _buttonPresses.add(TabletButton.nextColor);
+    });
   }
 
   void _setPenErasing(bool on) {

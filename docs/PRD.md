@@ -211,12 +211,12 @@ The tablet has six buttons in three rocker pairs, along the bottom when the tabl
 | --- | --- | --- |
 | Left | Redo | Undo |
 | Middle | Zoom in | Zoom out |
-| Right | Next color | New page |
+| Right | Next page (a new page after the last) | Previous page |
 
 - FR-B4 (P0). Zoom in centres on the pen's last position. Zoom out steps back until the whole page fits.
-- FR-B5 (P0). Next color cycles through the editor's palette and shows a short color chip on screen.
-- FR-B6 (P0). New page does what the controller's page button does (FR-X3).
-- FR-B7 (P1). The pen's two buttons: − erases while held (the pen tip erases the strokes it touches, and an Eraser chip shows), + is next color. They send Ctrl and Z, and Ctrl, Shift and Z, as keyboard reports on the same endpoint as the tablet's buttons. In Draw on phone mode they do not change what a finger does.
+- FR-B5 (P0). Next color (now on the pen's + button, FR-B7) cycles through the editor's palette and shows a short color chip on screen. A double press within 350 ms opens the ink color picker instead, so a single press waits out that window.
+- FR-B6 (P0). Next page moves the live page to the following page, or starts a new page when the live page is the last one, as the controller's page button does (FR-X3). Previous page moves back one page and does nothing on the first page. (Changed 2026-10-18: the right rocker was next color and new page.)
+- FR-B7 (P1). The pen's two buttons: − erases while held (the pen tip erases the strokes it touches, and an Eraser chip shows), + is next color and a double press opens the color picker. They send Ctrl and Z, and Ctrl, Shift and Z, as keyboard reports on the same endpoint as the tablet's buttons. In Draw on phone mode they do not change what a finger does.
 
 ### 6.7 Search and recognition
 
@@ -460,7 +460,7 @@ Decided:
 - Recognition is English only, on the phone. Syncing recognized text to a second device is not needed for the demo.
 - The app name and logo stay as they are.
 - The page button goes on the tablet housing. The BOOT button is the stand in until then. On the cable path one of the tablet's own buttons is New page (FR-B3).
-- The tablet's buttons are Undo, Redo, Zoom in, Zoom out, New page and Next color (FR-B3). There is no Previous color.
+- The tablet's buttons are Undo, Redo, Zoom in, Zoom out, Next page and Previous page (FR-B3). Next color moved to the pen's + button.
 - Only the live page edits. Other pages are view only (FR-E10, FR-E11).
 - UUIDs from `docs/protocol-v1.md` are locked.
 - Page button is `header_flags` bit 1 (FR-X3).

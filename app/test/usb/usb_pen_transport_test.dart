@@ -428,7 +428,7 @@ void main() {
       endpoint: 0x86,
     );
     await Future<void>.delayed(const Duration(milliseconds: 10));
-    expect(presses, [TabletButton.undo, TabletButton.nextColor]);
+    expect(presses, [TabletButton.undo, TabletButton.nextPage]);
     expect(packets, isEmpty);
     await sub.cancel();
   });

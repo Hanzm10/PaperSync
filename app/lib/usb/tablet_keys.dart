@@ -18,14 +18,17 @@ const int keyReportLength = 8;
 /// | Middle | `]` (0x30) | `[` (0x2F) |
 /// | Right | Space (0x2C) | Tab (0x2B) |
 ///
+/// The right rocker turns pages: top is next page (a new page after the
+/// last), bottom is previous page.
+///
 /// The tablet buttons match on the key alone.
 const Map<int, TabletButton> t605Keys = {
   0x2E: TabletButton.redo,
   0x2D: TabletButton.undo,
   0x30: TabletButton.zoomIn,
   0x2F: TabletButton.zoomOut,
-  0x2C: TabletButton.nextColor,
-  0x2B: TabletButton.newPage,
+  0x2C: TabletButton.nextPage,
+  0x2B: TabletButton.previousPage,
 };
 
 /// Left Ctrl and left Shift in the keyboard report's modifier byte.
@@ -41,7 +44,7 @@ int chord(int modifiers, int key) => (modifiers << 8) | key;
 /// | Pen button | Sends | App action |
 /// | --- | --- | --- |
 /// | − | Ctrl and Z | Erase while held |
-/// | + | Ctrl, Shift and Z | Next color |
+/// | + | Ctrl, Shift and Z | Next color, a double press opens the picker |
 ///
 /// These match on the key and the modifiers, before [t605Keys].
 final Map<int, TabletButton> t605Chords = {

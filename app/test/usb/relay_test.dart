@@ -204,7 +204,7 @@ void main() {
         ),
       );
       expect(out.packets, isEmpty);
-      expect(out.buttons, [TabletButton.undo, TabletButton.newPage]);
+      expect(out.buttons, [TabletButton.undo, TabletButton.previousPage]);
     });
 
     test('the page button marks the first sample of the new page', () {

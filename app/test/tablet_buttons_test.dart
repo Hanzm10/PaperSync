@@ -94,8 +94,8 @@ void main() {
         '0201002e00000000 0200000000000000': TabletButton.redo,
         '0200002f00000000 0200000000000000': TabletButton.zoomOut,
         '0200003000000000 0200000000000000': TabletButton.zoomIn,
-        '0200002b00000000 0200000000000000': TabletButton.newPage,
-        '0200002c00000000 0200000000000000': TabletButton.nextColor,
+        '0200002b00000000 0200000000000000': TabletButton.previousPage,
+        '0200002c00000000 0200000000000000': TabletButton.nextPage,
       };
       for (final entry in captured.entries) {
         expect(TabletKeyDecoder().add(_hex(entry.key)), [entry.value]);
@@ -209,16 +209,39 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(live().visibleStrokes, hasLength(1));
 
+      // One press changes the color once the double press window passes.
       pen.presses.add(TabletButton.nextColor);
       await Future<void>.delayed(Duration.zero);
-      final notebook = container
-          .read(appControllerProvider)
-          .notebook('nb-one')!;
+      var notebook = container.read(appControllerProvider).notebook('nb-one')!;
+      expect(notebook.inkColorArgb, AppColors.storedInk.toARGB32());
+      await Future<void>.delayed(
+        AppController.doublePress + const Duration(milliseconds: 50),
+      );
+      notebook = container.read(appControllerProvider).notebook('nb-one')!;
       expect(notebook.inkColorArgb, AppColors.inkBlue.toARGB32());
 
-      pen.presses.add(TabletButton.newPage);
+      // Next page on the last page starts a new one.
+      pen.presses.add(TabletButton.nextPage);
       await Future<void>.delayed(Duration.zero);
       expect(live().pageIndex, 2);
+      stroke(controller, 30);
+
+      // Previous page goes back, and stops at the first page.
+      pen.presses.add(TabletButton.previousPage);
+      await Future<void>.delayed(Duration.zero);
+      expect(live().pageIndex, 1);
+      expect(live().visibleStrokes, hasLength(1));
+      pen.presses.add(TabletButton.previousPage);
+      await Future<void>.delayed(Duration.zero);
+      expect(live().pageIndex, 1);
+
+      // Next page goes to the page that is there, without making another.
+      pen.presses.add(TabletButton.nextPage);
+      await Future<void>.delayed(Duration.zero);
+      expect(live().pageIndex, 2);
+      expect(live().visibleStrokes, hasLength(1));
+      final pages = container.read(appControllerProvider).notebook('nb-one')!;
+      expect(pages.pages, hasLength(2));
 
       pen.presses.add(TabletButton.zoomIn);
       await Future<void>.delayed(Duration.zero);
@@ -226,9 +249,32 @@ void main() {
         TabletButton.undo,
         TabletButton.redo,
         TabletButton.nextColor,
-        TabletButton.newPage,
+        TabletButton.nextPage,
+        TabletButton.previousPage,
+        TabletButton.previousPage,
+        TabletButton.nextPage,
         TabletButton.zoomIn,
       ]);
+      await sub.cancel();
+    });
+
+    test('a double press of the color button opens the picker', () async {
+      final controller = container.read(appControllerProvider.notifier)
+        ..startLive('nb-one');
+      final seen = <TabletButton>[];
+      final sub = controller.tabletButtons.listen(seen.add);
+      pen.presses.add(TabletButton.nextColor);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      pen.presses.add(TabletButton.nextColor);
+      await Future<void>.delayed(
+        AppController.doublePress + const Duration(milliseconds: 50),
+      );
+      expect(seen, [TabletButton.pickColor]);
+      // The color does not change on a double press.
+      final notebook = container
+          .read(appControllerProvider)
+          .notebook('nb-one')!;
+      expect(notebook.inkColorArgb, AppColors.storedInk.toARGB32());
       await sub.cancel();
     });
 
@@ -304,6 +350,9 @@ void main() {
 
     pen.presses.add(TabletButton.nextColor);
     await tester.pump();
+    await tester.pump(
+      AppController.doublePress + const Duration(milliseconds: 50),
+    );
     await tester.pump();
     expect(find.byKey(const Key('ink-flash')), findsOneWidget);
     expect(find.text('Blue ink'), findsOneWidget);

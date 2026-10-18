@@ -403,7 +403,7 @@ Mapping to millimetres: `xMm = x / 32759 * 170` and `yMm = y / 32759 * 107`, in 
 - **Security.** All bytes from BLE and USB are untrusted. Local data AES-256, key in Keychain or Keystore, Android backup off. Row level security forced on every table. No tokens or emails in logs. Debug tools only in debug builds.
 - **Privacy.** Recognition is on device. Nothing leaves the phone without sign in.
 - **Accessibility.** Dynamic type up to 200 percent, screen reader labels on every control, contrast per 7.1.
-- **Platforms.** Demo devices: any Android phone with USB host support for Bluetooth and USB (the exact model does not matter), and an iPhone for Bluetooth only. Android 8.0 and up (OTG needs Android 3.1 host support, practically all current phones). iOS 15 and up for Bluetooth. Confirm the phone supports USB host before offering USB mode.
+- **Platforms.** Demo device: any Android phone with USB host support, for Bluetooth and USB (the exact model does not matter). iOS keeps Bluetooth support but is outside the demo. Android 8.0 and up (OTG needs Android 3.1 host support, practically all current phones). iOS 15 and up for Bluetooth. Confirm the phone supports USB host before offering USB mode.
 - **Quality bar** (from the existing plan, still applies): strict lints, sealed classes, no `dynamic`, layer rules enforced by `test/architecture_test.dart`, `pubspec.lock` committed, dependency vulnerability scan before each merge.
 
 ## 10. Architecture changes
@@ -454,7 +454,7 @@ Decided:
 
 - The main product is the Android app with the notebook (decided 2026-10-18). The notebook reaches the phone through the ESP32 relay over Bluetooth, or straight over a USB cable. Both work on real hardware.
 - The web app (GitHub Pages) is a fallback, not a demo target. It runs the demo pen, and in Chrome and Edge it can reach the relay over Web Bluetooth, but that path is less reliable than the app and gets no further work unless the app fails.
-- Demo devices are any Android phone with USB host support and an iPhone (Bluetooth test). The Android model does not matter.
+- The demo device is an Android phone with USB host support, for both Bluetooth and the USB cable (decided 2026-10-18). The Android model does not matter. The iPhone is not a demo device. The iOS build still supports Bluetooth but is not tested for the demo.
 - No background capture. The screen stays awake during capture (FR-K7).
 - Recognition is English only, on the phone. Syncing recognized text to a second device is not needed for the demo.
 - The app name and logo stay as they are.

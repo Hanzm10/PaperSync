@@ -37,10 +37,15 @@ class PenLayout {
     this.eraser,
     this.tiltX,
     this.tiltY,
+    this.reportBytes = 0,
   });
 
   /// 0 when the device uses no report ids.
   final int reportId;
+
+  /// Bytes in one report, including the report id byte. A transfer can hold
+  /// several reports back to back. 0 when unknown.
+  final int reportBytes;
   final HidField x;
   final HidField y;
   final HidField? pressure;
@@ -130,10 +135,41 @@ List<PenLayout> penLayoutsFrom(Uint8List descriptor) {
         eraser: find(_pageDigitizer, 0x45) ?? find(_pageDigitizer, 0x3C),
         tiltX: find(_pageDigitizer, 0x3D),
         tiltY: find(_pageDigitizer, 0x3E),
+        reportBytes: _reportBytes(entry.key, entry.value),
       ),
     );
   }
   return layouts;
+}
+
+int _reportBytes(int reportId, List<HidField> fields) {
+  var bits = 0;
+  for (final field in fields) {
+    final end = field.bitOffset + field.bitSize;
+    if (end > bits) bits = end;
+  }
+  return (reportId == 0 ? 0 : 1) + (bits + 7) ~/ 8;
+}
+
+/// Every report for [layout] in [transfer]. A transfer can carry several
+/// reports back to back, and each one is cut out by the report's size.
+/// Anything that does not start with the report id ends the walk.
+List<PenReading> readPens(PenLayout layout, Uint8List transfer) {
+  final size = layout.reportBytes;
+  if (layout.reportId == 0 || size <= 0 || transfer.length < size * 2) {
+    final one = readPen(layout, transfer);
+    return one == null ? const [] : [one];
+  }
+  final readings = <PenReading>[];
+  for (var at = 0; at + size <= transfer.length; at += size) {
+    final reading = readPen(
+      layout,
+      Uint8List.sublistView(transfer, at, at + size),
+    );
+    if (reading == null) break;
+    readings.add(reading);
+  }
+  return readings;
 }
 
 /// Reads one transfer with [layout]. Returns null when the transfer is not

@@ -262,45 +262,55 @@ class UsbPenTransport implements PenTransport {
       _hexByte(transfer.endpoint),
       for (final b in bytes.take(12)) b.toRadixString(16).padLeft(2, '0'),
     ].join(' ');
-    final report = _penReportFrom(transfer, profile);
-    if (report == null) {
+    final reports = _penReportsFrom(transfer, profile);
+    if (reports.isEmpty) {
       droppedReports += 1;
       if (bytes.isNotEmpty) {
         _otherIds[bytes[0]] = (_otherIds[bytes[0]] ?? 0) + 1;
       }
       return;
     }
-    _penReports += 1;
-    for (final packet in packetizer.add(report, _nowMs())) {
-      _packetsSent += 1;
-      _notifications.add(packet);
+    final now = _nowMs();
+    for (final report in reports) {
+      _penReports += 1;
+      for (final packet in packetizer.add(report, now)) {
+        _packetsSent += 1;
+        _notifications.add(packet);
+      }
     }
     if (packetizer.hasPending && _flushTimer == null) {
       _flushTimer = Timer(flushAfter, _flushNow);
     }
   }
 
-  /// The pen report in [transfer], or null when it is not one or comes from
-  /// a source other than the one in use. Report ID 9 always takes over.
-  PenReport? _penReportFrom(UsbTransfer transfer, TabletProfile profile) {
+  /// The pen reports in [transfer]: none when it holds none, or when it
+  /// comes from a source other than the one in use. Report ID 9 always takes
+  /// over.
+  List<PenReport> _penReportsFrom(UsbTransfer transfer, TabletProfile profile) {
     final id9 = parsePenReport(transfer.data);
     if (id9 != null) {
       _source = '${_hexByte(transfer.endpoint)} id 9';
-      return id9;
+      return [id9];
     }
     for (final layout in _layouts[transfer.endpoint] ?? const <PenLayout>[]) {
-      final reading = readPen(layout, transfer.data);
-      if (reading == null) continue;
+      final readings = readPens(layout, transfer.data);
+      if (readings.isEmpty) continue;
       final key = '${_hexByte(transfer.endpoint)} id ${layout.reportId}';
-      if (_source != null && _source != key) return null;
+      if (_source != null && _source != key) return const [];
       _source = key;
-      return _scaled(reading, profile);
+      return [for (final reading in readings) _scaled(reading, profile)];
     }
-    return null;
+    return const [];
   }
 
-  /// A reading in the same units as Report ID 9, so the profile's corners
-  /// map it onto the whole active area.
+  /// A reading in the same units and frame as Report ID 9, so the profile's
+  /// corners map it onto the whole active area.
+  ///
+  /// The other pen report is made for phones: the tablet sends it already
+  /// turned to portrait, with the buttons along the bottom. Report ID 9 is
+  /// landscape. So the reading is turned back into the landscape frame here,
+  /// and the default orientation then gives the page exactly as the tablet
+  /// sent it.
   static PenReport _scaled(PenReading reading, TabletProfile profile) {
     int across(double unit, int min, int max) =>
         (min + unit * (max - min)).round();
@@ -309,8 +319,8 @@ class UsbPenTransport implements PenTransport {
       barrel: reading.barrel,
       eraser: reading.eraser,
       inRange: reading.inRange,
-      x: across(reading.x, profile.xMin, profile.xMax),
-      y: across(reading.y, profile.yMin, profile.yMax),
+      x: across(1 - reading.y, profile.xMin, profile.xMax),
+      y: across(reading.x, profile.yMin, profile.yMax),
       pressure: (reading.pressure * penMaxPressure).round(),
       tiltX: reading.tiltX.clamp(-127, 127),
       tiltY: reading.tiltY.clamp(-127, 127),

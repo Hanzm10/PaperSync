@@ -89,3 +89,11 @@ Tilt read (85, -82) at one corner and (0, 0) at another while the pen was held n
 ## Other tablet facts
 
 Active area 170 by 107 mm, centered on a 252 by 160 by 5 mm body. Hover height 15 mm. About 330 reports per second. Marketed at 5080 LPI.
+
+## Report ID 5 on a phone: measured
+
+On an Android phone (Samsung A07, USB OTG) the tablet sends no Report ID 9 at all. The pen arrives as Report ID 5 on endpoint `0x86`:
+
+- 8 bytes per report: id `05`, flags, X (16 bit), Y (16 bit), pressure (16 bit). Example: `05 c0 ff 0f 02 00 00 00`.
+- Each interrupt transfer packs two reports back to back, so a transfer is cut into reports by the size the report descriptor gives. Reading only the first drops half the points.
+- The report is already portrait, made for a phone screen: X runs across the short side and Y down the long side, with the buttons and the port along the bottom. Report ID 9 is landscape. The app turns Report ID 5 back into the landscape frame, so the default orientation (buttons along the bottom) shows it exactly as sent.

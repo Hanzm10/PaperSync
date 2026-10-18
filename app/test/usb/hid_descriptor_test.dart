@@ -130,4 +130,22 @@ void main() {
       }
     }
   });
+
+  test('knows the report size, so packed transfers can be split', () {
+    final low = penLayoutsFrom(_lowRes).single;
+    expect(low.reportBytes, 8);
+    expect(penLayoutsFrom(_penAndMouse).single.reportBytes, 10);
+    final two = _hex('0541ff0f0200ff07 0541000f0400ff07');
+    final readings = readPens(low, two);
+    expect(readings, hasLength(2));
+    expect(readings.first.x, 1.0);
+    expect(readings.last.x, closeTo(0xf00 / 4095, 1e-9));
+    // A stray byte after the reports is left alone.
+    expect(
+      readPens(low, _hex('0541ff0f0200ff07 0541000f0400ff07 00')),
+      hasLength(2),
+    );
+    // A single report still reads.
+    expect(readPens(low, _hex('0541ff0f0200ff07')), hasLength(1));
+  });
 }

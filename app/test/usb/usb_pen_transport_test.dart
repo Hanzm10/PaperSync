@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:papersync/ble/link_status.dart';
 import 'package:papersync/ble/pen_transport.dart';
+import 'package:papersync/domain/ink.dart';
 import 'package:papersync/platform/usb_host.dart';
 import 'package:papersync/platform/usb_pen_transport.dart';
 import 'package:papersync/protocol/codec.dart';
@@ -343,8 +344,14 @@ void main() {
       final sample =
           (decode(packets.first) as Decoded).notification.samples.single;
       expect(sample.touching, isTrue);
+      // The report is already portrait: X 4095, Y 0 is its top right
+      // corner. In the landscape tablet frame that is x 170, y 107, which the
+      // default orientation turns back to the page's top right.
       expect(sample.xMm, closeTo(170, 0.01));
-      expect(sample.yMm, closeTo(0, 0.01));
+      expect(sample.yMm, closeTo(107, 0.01));
+      final page = turnTablet(sample.xMm, sample.yMm, defaultTabletTurn);
+      expect(page.x, closeTo(pageWidthMm, 0.01));
+      expect(page.y, closeTo(0, 0.01));
       expect(sample.pressure, 16383);
       final lines = await transport.diagnostics();
       expect(lines, contains('Pen from: 0x86 id 5'));
@@ -371,5 +378,28 @@ void main() {
     expect(samples, hasLength(2));
     expect(samples.last.pressure, 1429);
     expect(transport.droppedReports, 1);
+  });
+
+  test('every report in a transfer is read, not just the first', () async {
+    host.opened = [
+      UsbOpenedInterface(
+        interfaceId: 2,
+        endpoint: 0x86,
+        descriptor: _lowResDescriptor,
+      ),
+    ];
+    await transport.connect(_tablet.name);
+    // Two reports back to back, as the tablet sends them on 0x86.
+    host.send(
+      '0541ff0f0200ff07'
+      '0541000f0400ff07',
+      endpoint: 0x86,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    final samples = [
+      for (final p in packets) ...(decode(p) as Decoded).notification.samples,
+    ];
+    expect(samples, hasLength(2));
+    expect(transport.droppedReports, 0);
   });
 }

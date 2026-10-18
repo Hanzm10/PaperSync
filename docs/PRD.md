@@ -452,6 +452,8 @@ Cut order if time runs out: lasso and ink style, paper style, starred pages and 
 
 Decided:
 
+- The main product is the Android app with the notebook (decided 2026-10-18). The notebook reaches the phone through the ESP32 relay over Bluetooth, or straight over a USB cable. Both work on real hardware.
+- The web app (GitHub Pages) is a fallback, not a demo target. It runs the demo pen, and in Chrome and Edge it can reach the relay over Web Bluetooth, but that path is less reliable than the app and gets no further work unless the app fails.
 - Demo devices are any Android phone with USB host support and an iPhone (Bluetooth test). The Android model does not matter.
 - No background capture. The screen stays awake during capture (FR-K7).
 - Recognition is English only, on the phone. Syncing recognized text to a second device is not needed for the demo.

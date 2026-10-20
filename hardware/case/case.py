@@ -174,16 +174,15 @@ def lid():
                                          (LID_HEAD_D - LID_HOLE_D) / 2,
                                          align=(Align.CENTER, Align.CENTER, Align.MIN))
     # Where a strap screw head would touch the lid, sink a shallow recess into
-    # the lid's inner face. Mirrored too (x -> WIDTH - x), because the lid is
-    # flipped over to fit and either way round should clear.
+    # the lid's inner face. The lid is flipped left to right to fit (the only
+    # way its screw holes line up), so x is mirrored.
     top = FLOOR + INNER_H
     for _, _, posts, z in straps():
         depth = z + STRAP_T + STRAP_HEAD_H + 0.3 - top
         if depth <= 0:
             continue
         for px, py in posts:
-            for x in (px, WIDTH - px):
-                body -= cyl(x, py, LID - depth, STRAP_HEAD_RECESS_D, depth + 1)
+            body -= cyl(WIDTH - px, py, LID - depth, STRAP_HEAD_RECESS_D, depth + 1)
     # Printed lip-up; flipped over it sits on the tray with the lip inside.
     return body
 

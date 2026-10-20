@@ -2,7 +2,6 @@
 
 Run:  pip install build123d matplotlib
       python3 case.py            # writes step/, stl/ and layout.png
-      python3 case.py --split    # also writes half parts for beds under 256 mm
 
 All sizes are millimetres. The view is from above with the tablet face up and
 its port and buttons at the bottom, so left and right match what you see.
@@ -13,7 +12,6 @@ a printed strap screwed onto two posts. A strip of foam tape under the strap
 takes up small measuring errors, so no board needs mounting holes.
 """
 
-import argparse
 import os
 
 from build123d import (Align, Box, Cone, Cylinder, Pos, RectangleRounded, export_step,
@@ -198,11 +196,6 @@ def strap_part(rect, posts):
     return s
 
 
-def splice():
-    """Plate glued across the seam inside the tray when it is printed in halves."""
-    return box(0, 0, 0, 40.0, 24.0, 2.0)
-
-
 def save(part, out, name):
     """Writes name.step (editable solid, for Fusion) and name.stl (for the slicer)."""
     export_step(part, os.path.join(out, "step", f"{name}.step"))
@@ -260,9 +253,6 @@ def layout_png(path):
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--split", action="store_true", help="also write halves for small beds")
-    args = ap.parse_args()
     here = os.path.dirname(os.path.abspath(__file__))
     for folder in ("step", "stl"):
         os.makedirs(os.path.join(here, folder), exist_ok=True)
@@ -272,14 +262,6 @@ def main():
     save(l, here, "lid")
     for i, (name, rect, posts, _) in enumerate(straps()):
         save(strap_part(rect, posts), here, f"strap_{i + 1}_{name}")
-    if args.split:
-        far = 2 * LENGTH
-        bottom = box(-10, -10, -10, WIDTH + 20, LENGTH / 2 + 10, 60)
-        top = box(-10, LENGTH / 2, -10, WIDTH + 20, far, 60)
-        for part, m in (("tray", t), ("lid", l)):
-            save(m & bottom, here, f"{part}_bottom_half")
-            save(m & top, here, f"{part}_top_half")
-        save(splice(), here, "splice_plate")
     layout_png(os.path.join(here, "layout.png"))
     print(f"tray {t.volume / 1000:.0f} cm3, lid {l.volume / 1000:.0f} cm3, height "
           f"{FLOOR + INNER_H + LID:g} mm")

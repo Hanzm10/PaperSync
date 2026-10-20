@@ -15,11 +15,10 @@ The lid velcros to the back of the tablet. The tray floor faces the desk.
 | `layout.png` | Top view for review, tablet face up, port edge at the bottom. |
 | `step/*.step` | The same parts as editable solids. Open these in Fusion (File > Open, or drag in) to change sizes by pushing and pulling faces. |
 | `stl/tray.stl`, `stl/lid.stl` | Whole parts for the slicer. Fit a 200 x 250 bed with the long side along the 250. |
-| `stl/*_half.stl`, `stl/splice_plate.stl` | Halves for smaller beds (Ender 3 and similar), joined with glue and two splice plates inside the tray. |
 | `stl/strap_*.stl` | One strap per board (two for the LiPo). |
 
 Regenerate after editing: `pip install build123d matplotlib`, then
-`python3 case.py --split`. It writes both the STEP and the STL files.
+`python3 case.py`. It writes both the STEP and the STL files.
 
 ## Layout
 

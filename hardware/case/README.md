@@ -20,16 +20,14 @@ Regenerate after editing: `pip install manifold3d trimesh matplotlib`, then
 
 ## Layout
 
-- **ESP32-S3**: bottom middle, both USB-C ports facing the bottom edge. The
-  tablet cable plugs in there, and the second port stays reachable for
-  reflashing without opening the case.
-- **TP4056**: bottom left, charging port on the left edge.
-- **Switch**: left edge, just above the charging port. Lies on its side with
-  the slider poking out through a 5 x 2.9 mm slot.
-- **MT3608**: between the TP4056 and the ESP32, so the 5 V wire is short.
+- **ESP32-S3**: lower left, both USB-C ports facing the left edge, next to
+  the tablet's own port, so the tablet cable stays short. The second port
+  stays reachable for reflashing without opening the case.
+- **TP4056**: bottom middle, charging port on the bottom edge.
+- **Switch**: left edge, above the ESP32 ports. Lies on its side with the
+  slider poking out through a 5 x 2.9 mm slot.
+- **MT3608**: next to the switch, between the battery and the ESP32.
 - **LiPo**: above the boards, held by two straps. Nothing screws through it.
-- The left edge is free for your hand only if you write right-handed; the
-  switch and charger sit there because they are only used before and after.
 
 ## How parts are held
 
@@ -60,6 +58,6 @@ These were guessed from the caliper sizes, so check them against your parts:
    header pins pointing down, the board sits on its pins.
 2. **Switch slider**: the slot is 5 mm long and 2.9 mm tall. File it wider if
    the slider rubs.
-3. **Tablet port position**: the ESP32 is centred on the bottom edge. If the
-   tablet's own port is near a corner, move it with `PARTS["ESP32-S3"]["pos"]`
-   so the cable stays short.
+3. **Tablet port position**: the ESP32 ports sit 40 to 61 mm up from the
+   bottom on the left edge. Move them with `PARTS["ESP32-S3"]["pos"]` and the
+   matching entry in `CUTOUTS` if the tablet's port is higher or lower.

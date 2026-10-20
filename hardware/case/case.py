@@ -53,27 +53,27 @@ FOAM, STRAP_T, STRAP_W = 1.0, 2.0, 8.0
 STRAP_POST_D, STRAP_PILOT_D, STRAP_HOLE_D = 6.0, 1.8, 2.4  # M2 self-tapping
 
 PARTS = {
-    # Ports face the bottom edge: the tablet cable plugs in from there, and the
-    # second USB-C port stays reachable for reflashing.
-    "ESP32-S3": dict(pos=(69.7, WALL + 0.5), size=(20.6, 70.6, 12.8),
-                     strap=("x", 52.0), open_side="bottom"),
-    # Charging port faces the left edge.
-    "TP4056": dict(pos=(WALL + 0.5, 20.0), size=(28.8, 17.5, 11.2),
-                   strap=("y", 18.0), open_side="left"),
-    "MT3608": dict(pos=(42.0, 20.0), size=(12.1, 37.4, 2.0),
-                   strap=("x", 18.7), open_side=None),
+    # Ports face the left edge, next to the tablet's own port, so the tablet
+    # cable stays short. The second USB-C port stays reachable for reflashing.
+    "ESP32-S3": dict(pos=(WALL + 0.5, 40.0), size=(70.6, 20.6, 12.8),
+                     strap=("y", 52.0), open_side="left"),
+    # Charging port faces the bottom edge, in the middle.
+    "TP4056": dict(pos=(80.0 - 17.5 / 2, WALL + 0.5), size=(17.5, 28.8, 11.2),
+                   strap=("x", 18.0), open_side="bottom"),
     # Lies on its side, slider pointing out through the left wall.
-    "Switch": dict(pos=(WALL, 50.0), size=(6.0, 8.5, 3.7),
+    "Switch": dict(pos=(WALL, 75.0), size=(6.0, 8.5, 3.7),
                    strap=("y", 4.5), open_side="left"),
-    "LiPo": dict(pos=(12.0, 72.0), size=(37.2, 60.9, 4.7),
+    "MT3608": dict(pos=(25.0, 76.0), size=(37.4, 12.1, 2.0),
+                   strap=("y", 18.7), open_side=None),
+    "LiPo": dict(pos=(20.0, 105.0), size=(37.2, 60.9, 4.7),
                  strap=("x", 15.0), strap2=("x", 44.0), open_side=None),
 }
 
 # Wall cutouts: (wall, centre along that wall, width, z from floor, height)
 CUTOUTS = {
-    "ESP32 USB-C x2": ("bottom", 80.0, 23.0, 2.0, 12.0),
-    "TP4056 USB-C": ("left", 20.0 + 17.5 / 2, 12.0, 0.5, 7.5),
-    "Switch slider": ("left", 50.0 + 8.5 / 2, 5.0, 0.4, 2.9),
+    "ESP32 USB-C x2": ("left", 40.0 + 20.6 / 2, 23.0, 2.0, 12.0),
+    "TP4056 USB-C": ("bottom", 80.0, 12.0, 0.5, 7.5),
+    "Switch slider": ("left", 75.0 + 8.5 / 2, 5.0, 0.4, 2.9),
 }
 
 
@@ -206,12 +206,13 @@ def layout_png(path):
         (x, y), (sx, sy, sz) = p["pos"], p["size"]
         ax.add_patch(Rectangle((x, y), sx, sy, fc=colors[name], ec="#222", alpha=0.75))
         label = f"{name}\n{sx:g}x{sy:g}x{sz:g}"
-        if sx < 15 and sy < 15:  # too small to hold its own label
-            ax.annotate(label, (x + sx, y + sy / 2), (x + sx + 14, y + sy / 2 + 6), fontsize=7,
+        if min(sx, sy) < 20:  # too narrow to hold its own label
+            lift = 22 if sy < 15 else 6
+            ax.annotate(label, (x + sx, y + sy / 2), (x + sx + 22, y + sy / 2 + lift), fontsize=7,
                         va="center", arrowprops=dict(arrowstyle="-", color="#444"))
             continue
         ax.text(x + sx / 2, y + sy / 2, label, ha="center", va="center", fontsize=6.5,
-                color="white", weight="bold", rotation=90 if sy > 2.5 * sx else 0)
+                color="white", weight="bold", rotation=90 if sy > 1.5 * sx else 0)
     for _, rect, posts, _ in straps():
         x0, y0, x1, y1 = rect
         ax.add_patch(Rectangle((x0, y0), x1 - x0, y1 - y0, fc="none", ec="#555", ls="--", lw=1))
@@ -228,7 +229,7 @@ def layout_png(path):
             ax.add_patch(Rectangle((-3, c - w / 2), 4, w, fc="red"))
             ax.annotate(label, (-3, c), (-50, c), va="center", ha="right", fontsize=8,
                         color="red", arrowprops=dict(arrowstyle="->", color="red"))
-    ax.text(WIDTH / 2, LENGTH / 2 + 20, "empty\n(room for wiring)", ha="center", color="#aaa")
+    ax.text(WIDTH / 2 + 20, LENGTH - 50, "empty\n(room for wiring)", ha="center", color="#aaa")
     ax.text(WIDTH / 2, -30, "BOTTOM EDGE (tablet port and buttons)", ha="center", fontsize=9)
     ax.text(WIDTH / 2, LENGTH + 6, f"Top view, tablet face up.  {WIDTH:g} x {LENGTH:g} x "
             f"{FLOOR + INNER_H + LID:g} mm", ha="center", fontsize=9)

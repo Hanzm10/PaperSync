@@ -11,12 +11,13 @@ The lid velcros to the back of the tablet. The tray floor faces the desk.
 | --- | --- |
 | `case.py` | The model. Every size is a named value at the top. Edit and rerun. |
 | `layout.png` | Top view for review, tablet face up, port edge at the bottom. |
-| `stl/tray.stl`, `stl/lid.stl` | Whole parts. Need a bed of at least 256 mm (Bambu A1, P1S, X1). |
+| `step/*.step` | The same parts as editable solids. Open these in Fusion (File > Open, or drag in) to change sizes by pushing and pulling faces. |
+| `stl/tray.stl`, `stl/lid.stl` | Whole parts for the slicer. Need a bed of at least 256 mm (Bambu A1, P1S, X1). |
 | `stl/*_half.stl`, `stl/splice_plate.stl` | Halves for smaller beds (Ender 3 and similar), joined with glue and two splice plates inside the tray. |
 | `stl/strap_*.stl` | One strap per board (two for the LiPo). |
 
-Regenerate after editing: `pip install manifold3d trimesh matplotlib`, then
-`python3 case.py --split`.
+Regenerate after editing: `pip install build123d matplotlib`, then
+`python3 case.py --split`. It writes both the STEP and the STL files.
 
 ## Layout
 

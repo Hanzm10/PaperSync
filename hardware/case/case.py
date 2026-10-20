@@ -1,7 +1,7 @@
 """PaperSync relay case: a tray the size of the T605 that velcros to its back.
 
-Run:  pip install manifold3d trimesh matplotlib
-      python3 case.py            # writes stl/ and layout.png
+Run:  pip install build123d matplotlib
+      python3 case.py            # writes step/, stl/ and layout.png
       python3 case.py --split    # also writes half parts for beds under 256 mm
 
 All sizes are millimetres. The view is from above with the tablet face up and
@@ -16,11 +16,10 @@ takes up small measuring errors, so no board needs mounting holes.
 import argparse
 import os
 
-import numpy as np
-import trimesh
-from manifold3d import CrossSection, JoinType, Manifold, set_circular_segments
+from build123d import (Align, Box, Cone, Cylinder, Pos, RectangleRounded, export_step,
+                       export_stl, extrude)
 
-set_circular_segments(48)
+MIN = (Align.MIN, Align.MIN, Align.MIN)
 
 # ---- Case -------------------------------------------------------------------
 WIDTH, LENGTH = 160.0, 252.0  # tablet footprint
@@ -77,16 +76,18 @@ CUTOUTS = {
 }
 
 
-def rounded_rect(w, h, r):
-    return CrossSection.square([w - 2 * r, h - 2 * r]).translate([r, r]).offset(r, JoinType.Round)
+def slab(x, y, w, h, r, z, height):
+    """Rounded rectangle with its lower-left corner at (x, y), extruded up from z."""
+    face = Pos(x, y, z) * RectangleRounded(w, h, r, align=(Align.MIN, Align.MIN))
+    return extrude(face, amount=height)
 
 
 def box(x, y, z, sx, sy, sz):
-    return Manifold.cube([sx, sy, sz]).translate([x, y, z])
+    return Pos(x, y, z) * Box(sx, sy, sz, align=MIN)
 
 
 def cyl(x, y, z, d, h):
-    return Manifold.cylinder(h, d / 2).translate([x, y, z])
+    return Pos(x, y, z) * Cylinder(d / 2, h, align=(Align.CENTER, Align.CENTER, Align.MIN))
 
 
 def straps():
@@ -111,9 +112,9 @@ def straps():
 
 
 def tray():
-    outer = rounded_rect(WIDTH, LENGTH, CORNER_R)
-    inner = rounded_rect(WIDTH - 2 * WALL, LENGTH - 2 * WALL, CORNER_R - WALL).translate([WALL, WALL])
-    body = outer.extrude(FLOOR + INNER_H) - inner.extrude(INNER_H + 1).translate([0, 0, FLOOR])
+    shell = slab(0, 0, WIDTH, LENGTH, CORNER_R, 0, FLOOR + INNER_H)
+    body = shell - slab(WALL, WALL, WIDTH - 2 * WALL, LENGTH - 2 * WALL, CORNER_R - WALL,
+                        FLOOR, INNER_H + 1)
 
     for x, y in LID_POSTS:
         body += cyl(x, y, 0, LID_POST_D, FLOOR + INNER_H)
@@ -140,7 +141,7 @@ def tray():
 
     # Keep strap posts and pockets inside the shell (posts near a wall merge
     # into it, which is fine, but must not poke out of it).
-    body = body ^ outer.extrude(FLOOR + INNER_H)
+    body = body & shell
 
     for _, (wall, c, w, z, h) in CUTOUTS.items():
         if wall == "bottom":
@@ -154,20 +155,18 @@ def tray():
 
 
 def lid():
-    plate = rounded_rect(WIDTH, LENGTH, CORNER_R).extrude(LID)
-    o = WALL + LIP_GAP
-    lip_out = rounded_rect(WIDTH - 2 * o, LENGTH - 2 * o, CORNER_R - o).translate([o, o])
-    i = o + LIP_W
-    lip_in = rounded_rect(WIDTH - 2 * i, LENGTH - 2 * i, CORNER_R - i).translate([i, i])
-    lip = (lip_out - lip_in).extrude(LIP_H).translate([0, 0, LID])
+    plate = slab(0, 0, WIDTH, LENGTH, CORNER_R, 0, LID)
+    o, i = WALL + LIP_GAP, WALL + LIP_GAP + LIP_W
+    lip = (slab(o, o, WIDTH - 2 * o, LENGTH - 2 * o, CORNER_R - o, LID, LIP_H)
+           - slab(i, i, WIDTH - 2 * i, LENGTH - 2 * i, CORNER_R - i, LID - 1, LIP_H + 2))
     for x, y in LID_POSTS:
         lip -= cyl(x, y, LID - 0.1, LID_POST_D + 1.0, LIP_H + 1)
     body = plate + lip
     for x, y in LID_POSTS:
         body -= cyl(x, y, -1, LID_HOLE_D, LID + 2)
         # Countersink on the outer face (z = 0), which goes against the tablet.
-        sink = Manifold.cylinder(1.7, LID_HEAD_D / 2, LID_HOLE_D / 2).translate([x, y, -0.01])
-        body -= sink
+        body -= Pos(x, y, -0.01) * Cone(LID_HEAD_D / 2, LID_HOLE_D / 2, 1.7,
+                                         align=(Align.CENTER, Align.CENTER, Align.MIN))
     # Printed lip-up; flipped over it sits on the tray with the lip inside.
     return body
 
@@ -185,10 +184,11 @@ def splice():
     return box(0, 0, 0, 40.0, 24.0, 2.0)
 
 
-def save(m, path):
-    mesh = m.to_mesh()
-    verts = np.asarray(mesh.vert_properties)[:, :3]
-    trimesh.Trimesh(verts, np.asarray(mesh.tri_verts)).export(path)
+def save(part, out, name):
+    """Writes name.step (editable solid, for Fusion) and name.stl (for the slicer)."""
+    export_step(part, os.path.join(out, "step", f"{name}.step"))
+    export_stl(part, os.path.join(out, "stl", f"{name}.stl"), tolerance=0.01,
+               angular_tolerance=0.2)
 
 
 def layout_png(path):
@@ -245,22 +245,24 @@ def main():
     ap.add_argument("--split", action="store_true", help="also write halves for small beds")
     args = ap.parse_args()
     here = os.path.dirname(os.path.abspath(__file__))
-    out = os.path.join(here, "stl")
-    os.makedirs(out, exist_ok=True)
+    for folder in ("step", "stl"):
+        os.makedirs(os.path.join(here, folder), exist_ok=True)
 
     t, l = tray(), lid()
-    save(t, os.path.join(out, "tray.stl"))
-    save(l, os.path.join(out, "lid.stl"))
+    save(t, here, "tray")
+    save(l, here, "lid")
     for i, (name, rect, posts, _) in enumerate(straps()):
-        save(strap_part(rect, posts), os.path.join(out, f"strap_{i + 1}_{name}.stl"))
+        save(strap_part(rect, posts), here, f"strap_{i + 1}_{name}")
     if args.split:
+        far = 2 * LENGTH
+        bottom = box(-10, -10, -10, WIDTH + 20, LENGTH / 2 + 10, 60)
+        top = box(-10, LENGTH / 2, -10, WIDTH + 20, far, 60)
         for part, m in (("tray", t), ("lid", l)):
-            a, b = m.split_by_plane([0, 1, 0], LENGTH / 2)
-            save(b, os.path.join(out, f"{part}_bottom_half.stl"))
-            save(a, os.path.join(out, f"{part}_top_half.stl"))
-        save(splice(), os.path.join(out, "splice_plate.stl"))
+            save(m & bottom, here, f"{part}_bottom_half")
+            save(m & top, here, f"{part}_top_half")
+        save(splice(), here, "splice_plate")
     layout_png(os.path.join(here, "layout.png"))
-    print(f"tray {t.volume() / 1000:.0f} cm3, lid {l.volume() / 1000:.0f} cm3, height "
+    print(f"tray {t.volume / 1000:.0f} cm3, lid {l.volume / 1000:.0f} cm3, height "
           f"{FLOOR + INNER_H + LID:g} mm")
 
 

@@ -42,7 +42,7 @@ takes up small measuring errors and stops rattling.
 
 - 7 x M3 x 8 countersunk self-tapping screws (lid). The heads sit flush, so
   nothing presses into the tablet.
-- 12 x M2 x 6 self-tapping screws (straps).
+- 12 x M2 x 6 pan head self-tapping screws (straps), head no taller than 1.6 mm. The lid has shallow recesses over the ESP32 strap screws so their heads clear.
 - 4 x 10 mm stick-on rubber bumpers (recesses under the tray).
 - Foam tape, velcro strips (two long strips along the lid edges work well).
 

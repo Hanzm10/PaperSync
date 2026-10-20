@@ -50,6 +50,7 @@ FOOT_D, FOOT_DEPTH = 10.5, 0.8
 POCKET_GAP, POCKET_WALL, POCKET_H = 0.5, 1.2, 3.0
 FOAM, STRAP_T, STRAP_W = 1.0, 2.0, 8.0
 STRAP_POST_D, STRAP_PILOT_D, STRAP_HOLE_D = 6.0, 1.8, 2.4  # M2 self-tapping
+STRAP_HEAD_H, STRAP_HEAD_RECESS_D = 1.6, 6.5  # M2 pan head; lid recess if it would touch
 
 PARTS = {
     # Ports face the left edge, next to the tablet's own port, so the tablet
@@ -170,6 +171,17 @@ def lid():
         # Countersink on the outer face (z = 0), which goes against the tablet.
         body -= Pos(x, y, -0.01) * Cone(LID_HEAD_D / 2, LID_HOLE_D / 2, 1.7,
                                          align=(Align.CENTER, Align.CENTER, Align.MIN))
+    # Where a strap screw head would touch the lid, sink a shallow recess into
+    # the lid's inner face. Mirrored too (x -> WIDTH - x), because the lid is
+    # flipped over to fit and either way round should clear.
+    top = FLOOR + INNER_H
+    for _, _, posts, z in straps():
+        depth = z + STRAP_T + STRAP_HEAD_H + 0.3 - top
+        if depth <= 0:
+            continue
+        for px, py in posts:
+            for x in (px, WIDTH - px):
+                body -= cyl(x, py, LID - depth, STRAP_HEAD_RECESS_D, depth + 1)
     # Printed lip-up; flipped over it sits on the tray with the lip inside.
     return body
 

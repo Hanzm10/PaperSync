@@ -1,6 +1,8 @@
 # PaperSync relay case
 
-A tray the same size as the T605 (160 x 252 mm), 21 mm tall with the lid.
+A tray 160 x 240 mm, 21 mm tall with the lid. The T605 is 160 x 252; the case
+is 12 mm shorter so it prints in one piece on a 200 x 250 bed. It lines up with
+the tablet's bottom edge.
 The lid velcros to the back of the tablet. The tray floor faces the desk.
 
 ![layout](layout.png)
@@ -12,7 +14,7 @@ The lid velcros to the back of the tablet. The tray floor faces the desk.
 | `case.py` | The model. Every size is a named value at the top. Edit and rerun. |
 | `layout.png` | Top view for review, tablet face up, port edge at the bottom. |
 | `step/*.step` | The same parts as editable solids. Open these in Fusion (File > Open, or drag in) to change sizes by pushing and pulling faces. |
-| `stl/tray.stl`, `stl/lid.stl` | Whole parts for the slicer. Need a bed of at least 256 mm (Bambu A1, P1S, X1). |
+| `stl/tray.stl`, `stl/lid.stl` | Whole parts for the slicer. Fit a 200 x 250 bed with the long side along the 250. |
 | `test_corner` | The 100 x 100 mm lower-left corner of the tray: ESP32, TP4056, switch and MT3608 pockets, the real port and switch openings, and their strap posts. Print it first to check the fit. |
 | `stl/*_half.stl`, `stl/splice_plate.stl` | Halves for smaller beds (Ender 3 and similar), joined with glue and two splice plates inside the tray. |
 | `stl/strap_*.stl` | One strap per board (two for the LiPo). |
@@ -40,11 +42,24 @@ takes up small measuring errors and stops rattling.
 
 ## Hardware
 
-- 7 x M3 x 8 countersunk self-tapping screws (lid). The heads sit flush, so
+- 7 x M2 x 10 countersunk (flat head) screws (lid). The heads sit flush, so
   nothing presses into the tablet.
 - 12 x M2 x 6 pan head self-tapping screws (straps), head no taller than 1.6 mm. The lid has shallow recesses over the ESP32 strap screws so their heads clear.
 - 4 x 10 mm stick-on rubber bumpers (recesses under the tray).
 - Foam tape, velcro strips (two long strips along the lid edges work well).
+
+## Screw holes
+
+The holes are plain, with no printed thread. M2 threads are too fine to print
+well, so the screws cut their own thread into the plastic:
+
+- Pilot holes in posts: 1.8 mm, so an M2 screw bites into the walls.
+- Clearance holes in straps and lid: 2.4 mm, so an M2 slides through.
+- Every pilot hole stops 0.8 mm above the bottom of the tray.
+
+Printed holes come out about 0.1 to 0.3 mm smaller than drawn, and these sizes
+already allow for that. If a screw is too tight, open the hole with a 2 mm
+drill bit by hand.
 
 ## Print settings
 

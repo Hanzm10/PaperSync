@@ -22,7 +22,9 @@ from build123d import (Align, Box, Cone, Cylinder, Pos, RectangleRounded, export
 MIN = (Align.MIN, Align.MIN, Align.MIN)
 
 # ---- Case -------------------------------------------------------------------
-WIDTH, LENGTH = 160.0, 252.0  # tablet footprint
+# Tablet is 160 x 252. The case is 12 mm shorter so it prints on a 200 x 250
+# bed; it lines up with the tablet's bottom edge and stops short at the top.
+WIDTH, LENGTH = 160.0, 240.0
 CORNER_R = 8.0
 WALL = 2.5
 FLOOR = 2.0
@@ -30,8 +32,11 @@ INNER_H = 16.5  # tallest stack: ESP32 12.8 + foam 1.0 + strap 2.0 + spare
 LID = 2.5
 LIP_H, LIP_W, LIP_GAP = 1.5, 1.2, 0.3  # lid lip that keys into the tray
 
-# Lid screws: M3 x 8 countersunk, self-tapping into the corner posts.
-LID_POST_D, LID_PILOT_D, LID_HOLE_D, LID_HEAD_D = 7.0, 2.5, 3.4, 6.2
+# Lid screws: M2 x 10 countersunk (flat head), self-tapping into the posts.
+LID_POST_D, LID_PILOT_D, LID_HOLE_D, LID_HEAD_D = 7.0, 1.8, 2.4, 4.2
+LID_PILOT_DEPTH = 10.0
+# Every screw hole keeps this much solid floor under it, so no tip pokes out.
+FLOOR_UNDER_HOLE = 0.8
 LID_POSTS = [
     (WALL + 3.0, WALL + 3.0), (WIDTH - WALL - 3.0, WALL + 3.0),
     (WALL + 3.0, LENGTH - WALL - 3.0), (WIDTH - WALL - 3.0, LENGTH - WALL - 3.0),
@@ -122,7 +127,7 @@ def tray():
 
     for x, y in LID_POSTS:
         body += cyl(x, y, 0, LID_POST_D, FLOOR + INNER_H)
-        body -= cyl(x, y, FLOOR + INNER_H - 10, LID_PILOT_D, 11)
+        body -= cyl(x, y, FLOOR + INNER_H - LID_PILOT_DEPTH, LID_PILOT_D, LID_PILOT_DEPTH + 1)
 
     # Locating pockets: a low rim around each part, open where a port or
     # slider has to reach the wall.
@@ -141,7 +146,8 @@ def tray():
     for _, _, posts, z in straps():
         for px, py in posts:
             body += cyl(px, py, 0, STRAP_POST_D, z)
-            body -= cyl(px, py, z - 8, STRAP_PILOT_D, 9)
+            bottom = max(z - 8, FLOOR_UNDER_HOLE)
+            body -= cyl(px, py, bottom, STRAP_PILOT_D, z - bottom + 1)
 
     # Keep strap posts and pockets inside the shell (posts near a wall merge
     # into it, which is fine, but must not poke out of it).
@@ -169,7 +175,8 @@ def lid():
     for x, y in LID_POSTS:
         body -= cyl(x, y, -1, LID_HOLE_D, LID + 2)
         # Countersink on the outer face (z = 0), which goes against the tablet.
-        body -= Pos(x, y, -0.01) * Cone(LID_HEAD_D / 2, LID_HOLE_D / 2, 1.7,
+        body -= Pos(x, y, -0.01) * Cone(LID_HEAD_D / 2, LID_HOLE_D / 2,
+                                         (LID_HEAD_D - LID_HOLE_D) / 2,
                                          align=(Align.CENTER, Align.CENTER, Align.MIN))
     # Where a strap screw head would touch the lid, sink a shallow recess into
     # the lid's inner face. Mirrored too (x -> WIDTH - x), because the lid is
@@ -245,7 +252,7 @@ def layout_png(path):
             ax.annotate(label, (-3, c), (-50, c), va="center", ha="right", fontsize=8,
                         color="red", arrowprops=dict(arrowstyle="->", color="red"))
     ax.text(WIDTH / 2 + 20, LENGTH - 50, "empty\n(room for wiring)", ha="center", color="#aaa")
-    ax.text(WIDTH / 2, -30, "BOTTOM EDGE (tablet port and buttons)", ha="center", fontsize=9)
+    ax.text(WIDTH / 2, -30, "BOTTOM EDGE (lines up with the tablet's bottom edge)", ha="center", fontsize=9)
     ax.text(WIDTH / 2, LENGTH + 6, f"Top view, tablet face up.  {WIDTH:g} x {LENGTH:g} x "
             f"{FLOOR + INNER_H + LID:g} mm", ha="center", fontsize=9)
     ax.set_xlim(-110, WIDTH + 10)

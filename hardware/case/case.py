@@ -74,9 +74,6 @@ PARTS = {
                  strap=("x", 15.0), strap2=("x", 44.0), open_side=None),
 }
 
-# Size of the fit-test corner piece (x, y), measured from the bottom-left.
-TEST_SIZE = (100.0, 100.0)
-
 # Wall cutouts: (wall, centre along that wall, width, z from floor, height)
 CUTOUTS = {
     "ESP32 USB-C x2": ("left", 40.0 + 20.6 / 2, 23.0, 2.0, 12.0),
@@ -283,9 +280,6 @@ def main():
             save(m & bottom, here, f"{part}_bottom_half")
             save(m & top, here, f"{part}_top_half")
         save(splice(), here, "splice_plate")
-    # Cheap fit test: the lower-left corner holding every board except the
-    # LiPo, with the real ports, switch slot, pockets and strap posts.
-    save(t & box(-1, -1, -1, TEST_SIZE[0] + 1, TEST_SIZE[1] + 1, 60), here, "test_corner")
     layout_png(os.path.join(here, "layout.png"))
     print(f"tray {t.volume / 1000:.0f} cm3, lid {l.volume / 1000:.0f} cm3, height "
           f"{FLOOR + INNER_H + LID:g} mm")

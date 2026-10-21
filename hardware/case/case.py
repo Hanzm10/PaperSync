@@ -14,7 +14,7 @@ takes up small measuring errors, so no board needs mounting holes.
 
 import os
 
-from build123d import (Align, Box, Cone, Cylinder, Pos, RectangleRounded, export_step,
+from build123d import (Align, Box, Cone, Cylinder, Pos, RectangleRounded, Rot, export_step,
                        export_stl, extrude)
 
 MIN = (Align.MIN, Align.MIN, Align.MIN)
@@ -259,8 +259,19 @@ def main():
     t, l = tray(), lid()
     save(t, here, "tray")
     save(l, here, "lid")
+    # Every strap also goes into one plate, for print services that cap the
+    # number of files.
+    plate, x = None, 0.0
     for i, (name, rect, posts, _) in enumerate(straps()):
-        save(strap_part(rect, posts), here, f"strap_{i + 1}_{name}")
+        strap = strap_part(rect, posts)
+        save(strap, here, f"strap_{i + 1}_{name}")
+        x0, y0, x1, y1 = rect
+        if x1 - x0 < y1 - y0:
+            strap = Pos(0, x1 - x0, 0) * Rot(0, 0, -90) * strap  # lay it lengthwise
+        strap = Pos(0, x, 0) * strap
+        plate = strap if plate is None else plate + strap
+        x += min(x1 - x0, y1 - y0) + 5
+    save(plate, here, "straps_all")
     layout_png(os.path.join(here, "layout.png"))
     print(f"tray {t.volume / 1000:.0f} cm3, lid {l.volume / 1000:.0f} cm3, height "
           f"{FLOOR + INNER_H + LID:g} mm")

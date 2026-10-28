@@ -1215,16 +1215,21 @@ class AppController extends Notifier<AppModel> {
     unawaited(write.catchError((Object _) {}));
   }
 
+  /// Swaps in [page]. Only its own notebook is copied, so every other
+  /// notebook keeps its identity and the screens showing it skip the work.
   void _replacePage(NotebookPage page) {
     state = state.copyWith(
       notebooks: [
         for (final notebook in state.notebooks)
-          notebook.copyWith(
-            pages: [
-              for (final current in notebook.pages)
-                if (current.id == page.id) page else current,
-            ],
-          ),
+          if (notebook.id == page.notebookId)
+            notebook.copyWith(
+              pages: [
+                for (final current in notebook.pages)
+                  if (current.id == page.id) page else current,
+              ],
+            )
+          else
+            notebook,
       ],
     );
   }

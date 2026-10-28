@@ -55,6 +55,13 @@ class InkPage extends StatelessWidget {
       accent: colors.accent,
       strokeWidthScale: strokeWidthScale,
     );
+    // Finished ink changes only when a stroke is added or edited, so Flutter
+    // may keep it as a bitmap and reuse it while the page zooms or scrolls.
+    final committed = CustomPaint(
+      isComplex: true,
+      painter: painter,
+      child: const SizedBox.expand(),
+    );
     final sheet = DecoratedBox(
       decoration: BoxDecoration(
         color: colors.page,
@@ -64,18 +71,14 @@ class InkPage extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(PaperTokens.radiusCard - 1),
         child: live == null
-            ? CustomPaint(painter: painter, child: const SizedBox.expand())
+            ? RepaintBoundary(child: committed)
             : Stack(
                 fit: StackFit.expand,
                 children: [
+                  RepaintBoundary(child: committed),
                   RepaintBoundary(
                     child: CustomPaint(
-                      painter: painter,
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-                  RepaintBoundary(
-                    child: CustomPaint(
+                      willChange: true,
                       painter: LiveInkPainter(
                         live: live!,
                         ink: colors.ink,

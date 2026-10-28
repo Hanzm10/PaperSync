@@ -283,7 +283,9 @@ class NotebookPage {
 
   bool get isDeleted => deletedAt != null;
 
-  List<Stroke> get visibleStrokes => List<Stroke>.unmodifiable(
+  /// Built once per page, so widgets that compare stroke lists by identity
+  /// (painters, for one) see the same list until the page changes.
+  late final List<Stroke> visibleStrokes = List<Stroke>.unmodifiable(
     strokes.where((stroke) => stroke.deletedAt == null),
   );
 

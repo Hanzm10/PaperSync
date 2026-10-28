@@ -47,6 +47,11 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
   Color? _flashColor;
   Timer? _flashTimer;
 
+  /// The pen's erase button is held.
+  bool _penErasing = false;
+
+  bool _pickerOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -279,7 +284,7 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                                   },
                                   child: InkPage(
                                     strokes: page.strokes,
-                                    hover: model.hover,
+                                    live: _controller?.liveInk,
                                     selectedStrokeId: drawing
                                         ? null
                                         : _selectedId,
@@ -303,7 +308,14 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
                                 ),
                               ),
                             ),
-                            if (flash != null)
+                            if (_penErasing)
+                              const Positioned(
+                                top: PaperTokens.space12,
+                                left: 0,
+                                right: 0,
+                                child: Center(child: _EraserChip()),
+                              )
+                            else if (flash != null)
                               Positioned(
                                 top: PaperTokens.space12,
                                 left: 0,
@@ -339,11 +351,32 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
         _zoom.zoomOut();
       case TabletButton.nextColor:
         _flash();
+      case TabletButton.eraseStart:
+        setState(() => _penErasing = true);
+      case TabletButton.eraseEnd:
+        setState(() => _penErasing = false);
+      case TabletButton.pickColor:
+        unawaited(_pickColor());
       case TabletButton.undo:
       case TabletButton.redo:
-      case TabletButton.newPage:
+      case TabletButton.nextPage:
+      case TabletButton.previousPage:
         setState(() => _selectedId = null);
     }
+  }
+
+  /// Opens the ink color picker from the pen's double press. A second double
+  /// press while it is open does nothing.
+  Future<void> _pickColor() async {
+    if (_pickerOpen) return;
+    final model = ref.read(appControllerProvider);
+    final notebook = model.notebook(widget.notebookId);
+    if (notebook == null) return;
+    _pickerOpen = true;
+    final color = await showInkColorPicker(context, initial: notebook.inkColor);
+    _pickerOpen = false;
+    if (color == null || !mounted) return;
+    _controller?.setInkColor(notebook.id, color);
   }
 
   /// Where the pen is or last wrote, as a fraction of the page. Null when
@@ -352,7 +385,9 @@ class _LiveCaptureScreenState extends ConsumerState<LiveCaptureScreen> {
     final model = ref.read(appControllerProvider);
     final pageId = model.livePageId;
     final page = pageId == null ? null : model.page(pageId);
-    StrokePoint? point = model.hover;
+    final live = _controller?.liveInk.value;
+    StrokePoint? point =
+        live?.hover ?? (live?.writing ?? false ? live!.points.last : null);
     if (point == null && page != null) {
       for (final stroke in page.strokes.reversed) {
         if (stroke.isDeleted || stroke.points.isEmpty) continue;
@@ -545,6 +580,38 @@ class _ColorChip extends StatelessWidget {
               _colorName(color),
               style: Theme.of(context).textTheme.labelMedium,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Shown while the pen's erase button is held.
+class _EraserChip extends StatelessWidget {
+  const _EraserChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.colors;
+    return DecoratedBox(
+      key: const Key('pen-eraser'),
+      decoration: BoxDecoration(
+        color: colors.page.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(PaperTokens.radiusButton),
+        border: Border.all(color: colors.line),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: PaperTokens.space12,
+          vertical: PaperTokens.space8,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PaperGlyphIcon(PaperGlyph.erase),
+            const SizedBox(width: PaperTokens.space8),
+            Text('Eraser', style: Theme.of(context).textTheme.labelMedium),
           ],
         ),
       ),

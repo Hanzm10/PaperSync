@@ -161,10 +161,24 @@ class _BlueConnection implements BleConnection {
 
   void listen() {
     _stateSub = _device.connectionState.listen((state) {
-      if (state == BluetoothConnectionState.disconnected && !_drops.isClosed) {
-        _drops.add(null);
-      }
+      if (state != BluetoothConnectionState.disconnected) return;
+      if (!_drops.isClosed) _drops.add(null);
+      // A link that drops by itself is never disconnect()ed, so it lets go of
+      // its own listeners. Each reconnect makes a new connection, and these
+      // would otherwise pile up, one set per drop.
+      unawaited(_release());
     });
+  }
+
+  Future<void> _release() async {
+    await _stateSub?.cancel();
+    _stateSub = null;
+    final characteristics = List.of(_characteristics);
+    _characteristics.clear();
+    for (final characteristic in characteristics) {
+      await characteristic.cancel();
+    }
+    if (!_drops.isClosed) await _drops.close();
   }
 
   void adopt(_BlueCharacteristic characteristic) {
@@ -226,13 +240,7 @@ class _BlueConnection implements BleConnection {
 
   @override
   Future<void> disconnect() async {
-    await _stateSub?.cancel();
-    _stateSub = null;
-    for (final characteristic in _characteristics) {
-      await characteristic.cancel();
-    }
-    _characteristics.clear();
-    if (!_drops.isClosed) await _drops.close();
+    await _release();
     await _device.disconnect();
   }
 }

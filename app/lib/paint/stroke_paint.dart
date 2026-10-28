@@ -5,14 +5,6 @@ import 'package:flutter/material.dart';
 
 import '../models/ink_models.dart';
 
-double strokeWidthPx(int pressure, double pageWidthPx) {
-  final t = (pressure / 16384).clamp(0.0, 1.0);
-  const hairlineMm = 0.35;
-  const penMm = 0.9;
-  final mm = hairlineMm + t * (penMm - hairlineMm);
-  return mm * pageWidthPx / pageWidthMm;
-}
-
 Offset pointOffset(StrokePoint point, Size size) {
   return Offset(
     point.xMm / pageWidthMm * size.width,
@@ -36,20 +28,29 @@ void paintStrokes(
   Color Function(Color stored)? resolve,
   double widthScale = 1,
 }) {
+  // Paths are built in millimetres, so one cached shape serves every size
+  // the page is shown at: the canvas does the scaling.
+  canvas.save();
+  canvas.scale(size.width / pageWidthMm, size.height / pageHeightMm);
+  final paint = Paint()
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round
+    ..isAntiAlias = true;
   for (final stroke in strokes) {
     if (stroke.deletedAt != null) continue;
     final color = resolve?.call(stroke.color) ?? stroke.color;
     if (stroke.id == selectedId) {
-      _paintStroke(
+      _paintRuns(
         canvas,
-        size,
-        stroke,
-        color: accent.withValues(alpha: 0.35),
-        widthScale: widthScale * 2.4,
+        paint,
+        _runsFor(stroke),
+        accent.withValues(alpha: 0.35),
+        widthScale * 2.4,
       );
     }
-    _paintStroke(canvas, size, stroke, color: color, widthScale: widthScale);
+    _paintRuns(canvas, paint, _runsFor(stroke), color, widthScale);
   }
+  canvas.restore();
 }
 
 void paintHover(Canvas canvas, Size size, StrokePoint hover, Color accent) {
@@ -64,51 +65,86 @@ void paintHover(Canvas canvas, Size size, StrokePoint hover, Color accent) {
   );
 }
 
-void _paintStroke(
-  Canvas canvas,
-  Size size,
-  Stroke stroke, {
-  required Color color,
-  required double widthScale,
-}) {
-  final points = stroke.points.where((point) => point.touching).toList();
-  if (points.isEmpty) return;
+/// Part of a stroke drawn at one width: a path in millimetres, or a single
+/// dot when the stroke is one point.
+class _Run {
+  const _Run(this.path, this.widthMm, {this.dot});
 
+  final Path path;
+  final double widthMm;
+  final Offset? dot;
+}
+
+/// Stroke shapes, built once per stroke. Strokes never change after they
+/// are made (an edit makes a new one), so the cache cannot go stale, and it
+/// lets go of a shape when its stroke is gone.
+final Expando<List<_Run>> _shapes = Expando<List<_Run>>('stroke shapes');
+
+/// Pen widths are rounded to steps this size, so a stroke becomes a few
+/// long paths instead of one tiny path per pair of points.
+const double _widthStepMm = 0.05;
+
+double _widthMm(int pressure) {
+  final t = (pressure / 16384).clamp(0.0, 1.0);
+  const hairlineMm = 0.35;
+  const penMm = 0.9;
+  final mm = hairlineMm + t * (penMm - hairlineMm);
+  return (mm / _widthStepMm).round() * _widthStepMm;
+}
+
+List<_Run> _runsFor(Stroke stroke) {
+  return _shapes[stroke] ??= _buildRuns(stroke.points);
+}
+
+List<_Run> _buildRuns(List<StrokePoint> all) {
+  final points = [
+    for (final point in all)
+      if (point.touching) point,
+  ];
+  if (points.isEmpty) return const [];
   if (points.length == 1) {
-    final width = strokeWidthPx(points.first.pressure, size.width) * widthScale;
-    canvas.drawCircle(
-      pointOffset(points.first, size),
-      width / 2,
-      Paint()..color = color,
-    );
-    return;
+    final point = points.first;
+    return [
+      _Run(Path(), _widthMm(point.pressure), dot: Offset(point.xMm, point.yMm)),
+    ];
   }
-
+  final runs = <_Run>[];
+  Path? path;
+  var width = -1.0;
   for (var i = 0; i < points.length - 1; i++) {
     final a = points[i];
     final b = points[i + 1];
-    final pressure = ((a.pressure + b.pressure) / 2).round();
-    final width = strokeWidthPx(pressure, size.width) * widthScale;
-    final start = pointOffset(a, size);
-    final end = pointOffset(b, size);
-    final path = Path()
-      ..moveTo(start.dx, start.dy)
-      ..quadraticBezierTo(
-        (start.dx + end.dx) / 2,
-        (start.dy + end.dy) / 2,
-        end.dx,
-        end.dy,
-      );
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..strokeWidth = width
-        ..isAntiAlias = true,
-    );
+    final next = _widthMm(((a.pressure + b.pressure) / 2).round());
+    if (path == null || next != width) {
+      path = Path()..moveTo(a.xMm, a.yMm);
+      width = next;
+      runs.add(_Run(path, width));
+    }
+    path.lineTo(b.xMm, b.yMm);
+  }
+  return runs;
+}
+
+void _paintRuns(
+  Canvas canvas,
+  Paint paint,
+  List<_Run> runs,
+  Color color,
+  double widthScale,
+) {
+  paint.color = color;
+  for (final run in runs) {
+    final width = run.widthMm * widthScale;
+    final dot = run.dot;
+    if (dot != null) {
+      paint.style = PaintingStyle.fill;
+      canvas.drawCircle(dot, width / 2, paint);
+      continue;
+    }
+    paint
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = width;
+    canvas.drawPath(run.path, paint);
   }
 }
 

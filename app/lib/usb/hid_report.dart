@@ -72,6 +72,20 @@ class PenReport {
       'pressure: $pressure, tilt: $tiltX/$tiltY)';
 }
 
+/// A readout of a pen report's first data byte, for finding out what the pen
+/// buttons send: the raw byte, then the bits the app knows, such as
+/// `c2 = in range, barrel`.
+String penBits(int raw, PenReport report) {
+  final names = [
+    if (report.tip) 'tip',
+    if (report.inRange) 'in range',
+    if (report.barrel) 'barrel',
+    if (report.eraser) 'eraser',
+  ];
+  final hex = raw.toRadixString(16).padLeft(2, '0');
+  return names.isEmpty ? hex : '$hex = ${names.join(', ')}';
+}
+
 /// Decodes one interrupt IN report. Returns null for anything that is not a
 /// well formed Report ID 9: the wrong length, another report id (the same
 /// interface also carries vendor and mouse reports), or empty input. The

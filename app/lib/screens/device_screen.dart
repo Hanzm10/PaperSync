@@ -235,6 +235,9 @@ class _Bonded extends StatelessWidget {
                         : formatTime(link.lastPacket!),
                   ),
                 ],
+                // Inside the scroll, so no line hides behind the system
+                // navigation bar.
+                const LinkCheck(),
               ],
             ),
           ),
@@ -255,7 +258,7 @@ class _Bonded extends StatelessWidget {
             ),
           ),
         ),
-        const LinkCheck(),
+        SizedBox(height: MediaQuery.paddingOf(context).bottom),
       ],
     );
   }

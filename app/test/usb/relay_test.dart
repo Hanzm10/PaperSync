@@ -120,6 +120,38 @@ void main() {
     });
   });
 
+  group('bare notifications', () {
+    test('a header and one report fit the 20 bytes of a default link', () {
+      final pen = _hex('03 08 34 12 64 00 00 00 88 13 00 00 05c0ba0aec090000');
+      expect(pen.length, 20);
+      final n = (decodeRelay(pen) as RelayDecoded).notification;
+      expect(n.bare, isTrue);
+      expect(n.firstSeq, 100);
+      expect(n.records.single.dtMs, 0);
+      expect(n.records.single.report, _hex('05c0ba0aec090000'));
+      expect(encodeRelay(n), pen);
+    });
+
+    test('bare pen and button notifications decode like full ones', () {
+      final decoder = RelayDecoder(profile: lumisparkT605)
+        ..setDescriptor(_lowResDescriptor);
+      final pen = decoder.add(
+        _relay(flags: flagBare | flagReplayed, reports: [_topRight]),
+      );
+      final sample = _samples(pen.packets).single;
+      expect(sample.touching, isTrue);
+      expect(sample.seq, 100);
+      expect(
+        (decode(pen.packets.single) as Decoded).notification.replayed,
+        isTrue,
+      );
+      final keys = decoder.add(
+        _relay(flags: flagControl | flagBare, reports: ['0201002d00000000']),
+      );
+      expect(keys.buttons, [TabletButton.undo]);
+    });
+  });
+
   group('RelayDecoder', () {
     late RelayDecoder decoder;
 
@@ -153,6 +185,16 @@ void main() {
       expect(decoder.penSource, '0x0 id 5');
     });
 
+    test('unknown keys show in the readout with no name', () {
+      decoder.add(
+        _relay(
+          flags: flagControl,
+          reports: ['0200001400000000', '0200000000000000'],
+        ),
+      );
+      expect(decoder.recentControl, ['02 00 00 14 00 00 00 00']);
+    });
+
     test('control notifications are the tablet\'s buttons', () {
       final out = decoder.add(
         _relay(
@@ -162,7 +204,7 @@ void main() {
         ),
       );
       expect(out.packets, isEmpty);
-      expect(out.buttons, [TabletButton.undo, TabletButton.newPage]);
+      expect(out.buttons, [TabletButton.undo, TabletButton.previousPage]);
     });
 
     test('the page button marks the first sample of the new page', () {
@@ -237,9 +279,11 @@ void main() {
       final lines = relay.diagnostics();
       expect(lines[0], startsWith('Bluetooth: not connected, 2 relay'));
       expect(lines[1], 'Pen from: 0x0 id 5');
-      expect(lines[2], contains('id 5: x 0-4095'));
-      expect(lines[3], 'Buttons: zoomIn');
-      expect(lines[5], contains('v1 1'));
+      // The pen's first data byte: 41 is tip down, in this layout.
+      expect(lines[2], 'Pen bits: 41 = tip');
+      expect(lines[3], 'Buttons: 02 00 00 30 00 00 00 00 = zoomIn');
+      expect(lines[4], contains('id 5: x 0-4095'));
+      expect(lines[6], contains('v1 1'));
       await relay.dispose();
       expect(inner.disposed, isTrue);
     });

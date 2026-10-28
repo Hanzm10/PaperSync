@@ -13,7 +13,9 @@ import '../capture/markers.dart';
 import '../capture/tablet_turn.dart';
 import '../data/sample_notebooks.dart';
 import '../models/ink_models.dart';
+import '../models/live_ink.dart';
 import '../models/pen_link.dart';
+import '../paint/stroke_paint.dart';
 import '../platform/relay_pen_transport.dart';
 import '../platform/usb_pen_transport.dart';
 import '../protocol/codec.dart';
@@ -144,6 +146,18 @@ class AppController extends Notifier<AppModel> {
     DebugInkStats.empty,
   );
 
+  /// The stroke being written and the hover point, for the live page's ink
+  /// layer. Kept out of [state] so the pen's report rate does not rebuild
+  /// every screen.
+  final ValueNotifier<LiveInk> liveInk = ValueNotifier<LiveInk>(LiveInk.empty);
+
+  // The open stroke. Its points grow in place and join the page on close.
+  List<StrokePoint> _openPoints = [];
+  String _openId = '';
+  String _openPageId = '';
+  int _openColor = 0;
+  DateTime _openCreated = DateTime.fromMillisecondsSinceEpoch(0);
+
   static const double _phonePressure = 0.55;
 
   bool _active = true;
@@ -153,6 +167,10 @@ class AppController extends Notifier<AppModel> {
   /// True when the live page was assigned for drawing on the phone.
   bool _phoneSession = false;
   bool _strokeOpen = false;
+
+  /// The pen's erase button is held: its touches erase strokes instead of
+  /// drawing.
+  bool _penErasing = false;
   bool _replaying = false;
   int _replayStrokes = 0;
   int _seqGaps = 0;
@@ -200,6 +218,7 @@ class AppController extends Notifier<AppModel> {
       _active = false;
       _epoch += 1;
       _checkpoints.stop();
+      _colorTimer?.cancel();
       unawaited(notes.cancel());
       unawaited(status.cancel());
       unawaited(battery.cancel());
@@ -207,7 +226,8 @@ class AppController extends Notifier<AppModel> {
       unawaited(_scanSub?.cancel());
       unawaited(transport.dispose());
       if (_ownsStore) unawaited(_store.close());
-      debugStats.dispose();
+      // Riverpod keeps this controller across rebuilds, such as a change of
+      // connection, so its notifiers stay alive with it.
     });
     final AppModel base;
     final initial = _initial;
@@ -231,12 +251,9 @@ class AppController extends Notifier<AppModel> {
   /// Undo history stays in memory. A kill during a stroke keeps the last
   /// checkpoint, not the undo stack.
   Future<void> flushOpenStroke() async {
-    if (!_strokeOpen) return;
-    final pageId = state.livePageId;
-    final page = pageId == null ? null : state.page(pageId);
-    if (page == null || page.strokes.isEmpty) return;
+    if (!_strokeOpen || _openPoints.isEmpty) return;
     await _store.writeCheckpoint(
-      OpenCheckpoint(pageId: page.id, stroke: page.strokes.last),
+      OpenCheckpoint(pageId: _openPageId, stroke: _openAsStroke()),
       flush: true,
     );
     await _store.flush();
@@ -345,10 +362,7 @@ class AppController extends Notifier<AppModel> {
     if (page == null || !history.canUndo) return;
     final previous = history.undo.last;
     final undo = history.undo.sublist(0, history.undo.length - 1);
-    final redo = [
-      ...history.redo,
-      page.strokes.map((stroke) => stroke.copy()).toList(),
-    ];
+    final redo = [...history.redo, List<Stroke>.of(page.strokes)];
     _writePage(
       pageId,
       page.copyWith(strokes: _restored(page.strokes, previous)),
@@ -363,10 +377,7 @@ class AppController extends Notifier<AppModel> {
     if (page == null || !history.canRedo) return;
     final next = history.redo.last;
     final redo = history.redo.sublist(0, history.redo.length - 1);
-    final undo = [
-      ...history.undo,
-      page.strokes.map((stroke) => stroke.copy()).toList(),
-    ];
+    final undo = [...history.undo, List<Stroke>.of(page.strokes)];
     _writePage(
       pageId,
       page.copyWith(strokes: _restored(page.strokes, next)),
@@ -629,10 +640,7 @@ class AppController extends Notifier<AppModel> {
 
   void drawMove(Offset mm, {double pressure = _phonePressure}) {
     if (!_capturing || !state.phoneDrawing || !_strokeOpen) return;
-    final pageId = state.livePageId;
-    final page = pageId == null ? null : state.page(pageId);
-    if (page == null || page.strokes.isEmpty) return;
-    if (page.strokes.last.points.length >= maxPointsPerStroke) {
+    if (_openPoints.length >= maxPointsPerStroke) {
       _apply(const StrokeClosed());
       drawStart(mm, pressure: pressure);
       return;
@@ -657,6 +665,46 @@ class AppController extends Notifier<AppModel> {
         return;
       }
     }
+  }
+
+  /// The live notebook's pages in order, deleted ones left out.
+  List<NotebookPage> _livePages() {
+    final notebookId = state.liveNotebookId;
+    final notebook = notebookId == null ? null : state.notebook(notebookId);
+    if (notebook == null) return const [];
+    return [
+      for (final page in notebook.pages)
+        if (!page.isDeleted) page,
+    ]..sort((a, b) => a.pageIndex.compareTo(b.pageIndex));
+  }
+
+  /// Moves the live page to the next page, or starts a new one after the
+  /// last page.
+  void nextLivePage() {
+    if (!_capturing) return;
+    final pages = _livePages();
+    final at = pages.indexWhere((page) => page.id == state.livePageId);
+    if (at < 0 || at == pages.length - 1) {
+      newLivePage();
+      return;
+    }
+    _showLivePage(pages[at + 1].id);
+  }
+
+  /// Moves the live page back one page. Nothing happens on the first page.
+  void previousLivePage() {
+    if (!_capturing) return;
+    final pages = _livePages();
+    final at = pages.indexWhere((page) => page.id == state.livePageId);
+    if (at <= 0) return;
+    _showLivePage(pages[at - 1].id);
+  }
+
+  void _showLivePage(String pageId) {
+    if (_strokeOpen) _apply(const StrokeClosed());
+    liveInk.value = LiveInk.empty;
+    state = state.copyWith(livePageId: pageId, hover: null);
+    _resetMachine();
   }
 
   /// Starts the next page of the live notebook, as the pen's page button does.
@@ -685,6 +733,7 @@ class AppController extends Notifier<AppModel> {
 
   void stopLive() {
     _capturing = false;
+    if (_active) _setPenErasing(false);
     _phoneSession = false;
     final transport = _transport;
     if (transport is SimulatedPenTransport) transport.stop();
@@ -694,6 +743,7 @@ class AppController extends Notifier<AppModel> {
       _apply(event);
     }
     if (_strokeOpen && state.phoneDrawing) _apply(const StrokeClosed());
+    liveInk.value = LiveInk.empty;
     state = state.copyWith(clearLive: true, hover: null, phoneDrawing: false);
   }
 
@@ -750,12 +800,19 @@ class AppController extends Notifier<AppModel> {
       _apply(event);
     }
     if (!_active) return;
-    state = state.copyWith(link: state.link.copyWith(lastPacket: arrival));
+    // The time of the last packet is only shown to the second, so the app
+    // state, which every screen watches, changes at most once a second.
+    final last = state.link.lastPacket;
+    if (last == null || arrival.difference(last).inMilliseconds >= 1000) {
+      state = state.copyWith(link: state.link.copyWith(lastPacket: arrival));
+    }
   }
 
   void _onStatus(LinkStatus status) {
     if (!_active) return;
     _linkStatus = status;
+    // A link that drops cannot report the erase button coming back up.
+    if (status is! Connected) _setPenErasing(false);
     final dropped = switch (status) {
       Disconnected() || Unavailable() => true,
       Connecting() || Connected() || Reconnecting() => false,
@@ -779,25 +836,28 @@ class AppController extends Notifier<AppModel> {
     if (!_active) return;
     switch (event) {
       case StrokeOpened(:final point):
-        _openStroke(point);
-        if (_replaying) {
-          _replayStrokes += 1;
-          _paintLink(saved: false);
+        if (_penErasing && !state.phoneDrawing) {
+          _eraseAt(point);
+        } else {
+          _openStroke(point);
+          if (_replaying) {
+            _replayStrokes += 1;
+            _paintLink(saved: false);
+          }
         }
       case PointAdded(:final point):
-        _addPoint(point);
-      case StrokeClosed():
-        final pageId = state.livePageId;
-        final page = pageId == null ? null : state.page(pageId);
-        _strokeOpen = false;
-        _checkpoints.stop();
-        if (page != null && page.strokes.isNotEmpty) {
-          _persist(_store.saveClosedStroke(page.id, page.strokes.last));
+        if (_penErasing && !state.phoneDrawing) {
+          _eraseAt(point);
+        } else {
+          _addPoint(point);
         }
+      case StrokeClosed():
+        // An erasing touch opened no stroke, so there is nothing to save.
+        _commitOpenStroke();
       case HoverMoved(:final point):
-        state = state.copyWith(hover: point);
+        if (!_strokeOpen) liveInk.value = LiveInk(hover: point);
       case HoverLost():
-        if (state.hover != null) state = state.copyWith(hover: null);
+        if (liveInk.value.hover != null) liveInk.value = LiveInk.empty;
       case PageTurned():
         _turnLivePage();
       case SamplesLost(:final count):
@@ -827,37 +887,59 @@ class AppController extends Notifier<AppModel> {
     if (page == null || notebook == null) return;
     // Each new stroke is a step that undo takes back.
     _pushUndo(page.id);
-    final stroke = Stroke(
-      id: newId(),
-      points: [point],
-      colorArgb: notebook.inkColorArgb,
-      createdAt: _when(point),
-    );
-    _replacePage(page.copyWith(strokes: [...page.strokes, stroke]));
+    _openId = newId();
+    _openPageId = page.id;
+    _openColor = notebook.inkColorArgb;
+    _openCreated = _when(point);
+    _openPoints = [point];
     _strokeOpen = true;
     _checkpoints.start(_checkpointTick);
-    if (state.hover != null) state = state.copyWith(hover: null);
+    _publishOpen();
   }
 
   void _addPoint(StrokePoint point) {
     if (!_strokeOpen) return;
-    final pageId = state.livePageId;
-    final page = pageId == null ? null : state.page(pageId);
-    if (page == null || page.strokes.isEmpty) return;
-    final last = page.strokes.last;
-    final strokes = [
-      ...page.strokes.sublist(0, page.strokes.length - 1),
-      last.copyWith(points: [...last.points, point]),
-    ];
-    _replacePage(page.copyWith(strokes: strokes));
+    _openPoints.add(point);
+    _publishOpen();
+  }
+
+  void _publishOpen() {
+    liveInk.value = LiveInk(points: _openPoints, colorArgb: _openColor);
+  }
+
+  /// The open stroke as a stroke, for a checkpoint or for the page.
+  Stroke _openAsStroke() {
+    return Stroke(
+      id: _openId,
+      points: _openPoints,
+      colorArgb: _openColor,
+      createdAt: _openCreated,
+    );
+  }
+
+  /// Puts the open stroke on its page and saves it. The page gets one update
+  /// per stroke, not one per point.
+  void _commitOpenStroke() {
+    if (!_strokeOpen) return;
+    _strokeOpen = false;
+    _checkpoints.stop();
+    final stroke = _openAsStroke();
+    _openPoints = [];
+    liveInk.value = LiveInk.empty;
+    final page = state.page(_openPageId);
+    if (page == null || stroke.points.isEmpty) return;
+    _replacePage(page.copyWith(strokes: [...page.strokes, stroke]));
+    _persist(_store.saveClosedStroke(page.id, stroke));
   }
 
   void _turnLivePage() {
     final notebookId = state.liveNotebookId;
     if (notebookId == null) return;
+    // A stroke still being written stays on the page it was written on.
+    _commitOpenStroke();
     final id = addPage(notebookId);
     if (id.isEmpty) return;
-    _strokeOpen = false;
+    liveInk.value = LiveInk.empty;
     state = state.copyWith(livePageId: id, hover: null);
   }
 
@@ -976,23 +1058,79 @@ class AppController extends Notifier<AppModel> {
   }
 
   void _onButton(TabletButton button) {
-    if (!_capturing || !_active) return;
+    if (!_active) return;
+    if (button == TabletButton.eraseEnd) {
+      // Always let go, so the pen cannot stay stuck erasing.
+      _setPenErasing(false);
+      return;
+    }
+    if (!_capturing) return;
     final pageId = state.livePageId;
     if (pageId == null) return;
     switch (button) {
+      case TabletButton.eraseStart:
+        // A stroke being written when the button goes down ends there.
+        if (_strokeOpen && !state.phoneDrawing) _apply(const StrokeClosed());
+        _setPenErasing(true);
+        return;
+      case TabletButton.eraseEnd:
+        return;
       case TabletButton.undo:
         undo(pageId);
       case TabletButton.redo:
         redo(pageId);
-      case TabletButton.newPage:
-        newLivePage();
+      case TabletButton.nextPage:
+        nextLivePage();
+      case TabletButton.previousPage:
+        previousLivePage();
       case TabletButton.nextColor:
-        _nextColor();
+        _colorPress();
+        return;
+      case TabletButton.pickColor:
       case TabletButton.zoomIn:
       case TabletButton.zoomOut:
         break;
     }
     _buttonPresses.add(button);
+  }
+
+  /// A second press this soon after the first is a double press.
+  static const Duration doublePress = Duration(milliseconds: 350);
+  Timer? _colorTimer;
+
+  /// One press of the color button is the next color, two quick presses
+  /// open the picker. The single press waits out [doublePress] so a double
+  /// press does not also change the color.
+  void _colorPress() {
+    if (_colorTimer?.isActive ?? false) {
+      _colorTimer!.cancel();
+      _colorTimer = null;
+      _buttonPresses.add(TabletButton.pickColor);
+      return;
+    }
+    _colorTimer = Timer(doublePress, () {
+      _colorTimer = null;
+      if (!_active || !_capturing) return;
+      _nextColor();
+      _buttonPresses.add(TabletButton.nextColor);
+    });
+  }
+
+  void _setPenErasing(bool on) {
+    if (_penErasing == on) return;
+    _penErasing = on;
+    _buttonPresses.add(on ? TabletButton.eraseStart : TabletButton.eraseEnd);
+  }
+
+  /// Erases the stroke under a touching pen point, while the erase button
+  /// is held.
+  void _eraseAt(StrokePoint point) {
+    if (!point.touching) return;
+    final pageId = state.livePageId;
+    final page = pageId == null ? null : state.page(pageId);
+    if (page == null) return;
+    final id = hitStroke(page.strokes, Offset(point.xMm, point.yMm));
+    if (id != null) eraseStroke(page.id, id);
   }
 
   /// Moves the live notebook's ink to the next color of the palette. A color
@@ -1012,10 +1150,7 @@ class AppController extends Notifier<AppModel> {
     final page = state.page(pageId);
     if (page == null) return;
     final history = state.historyFor(pageId);
-    final undo = [
-      ...history.undo,
-      page.strokes.map((stroke) => stroke.copy()).toList(),
-    ];
+    final undo = [...history.undo, List<Stroke>.of(page.strokes)];
     if (undo.length > 50) undo.removeAt(0);
     _setHistory(pageId, PageHistory(undo: undo, redo: const []));
   }
@@ -1054,31 +1189,47 @@ class AppController extends Notifier<AppModel> {
   }
 
   void _checkpointTick() {
-    if (!_active || !_strokeOpen) return;
-    final pageId = state.livePageId;
-    final page = pageId == null ? null : state.page(pageId);
-    if (page == null || page.strokes.isEmpty) return;
+    if (!_active || !_strokeOpen || _openPoints.isEmpty) return;
     _persist(
       _store.writeCheckpoint(
-        OpenCheckpoint(pageId: page.id, stroke: page.strokes.last),
+        OpenCheckpoint(pageId: _openPageId, stroke: _openAsStroke()),
       ),
     );
+  }
+
+  /// Stores what handwriting recognition read on a page. Only the text
+  /// changes, so strokes written meanwhile are kept.
+  void setRecognizedText(String pageId, String text) {
+    for (final notebook in state.notebooks) {
+      for (final page in notebook.pages) {
+        if (page.id != pageId) continue;
+        if (page.recognizedText == text) return;
+        _replacePage(page.copyWith(recognizedText: text));
+        _persist(_store.setRecognizedText(pageId, text));
+        return;
+      }
+    }
   }
 
   void _persist(Future<void> write) {
     unawaited(write.catchError((Object _) {}));
   }
 
+  /// Swaps in [page]. Only its own notebook is copied, so every other
+  /// notebook keeps its identity and the screens showing it skip the work.
   void _replacePage(NotebookPage page) {
     state = state.copyWith(
       notebooks: [
         for (final notebook in state.notebooks)
-          notebook.copyWith(
-            pages: [
-              for (final current in notebook.pages)
-                if (current.id == page.id) page else current,
-            ],
-          ),
+          if (notebook.id == page.notebookId)
+            notebook.copyWith(
+              pages: [
+                for (final current in notebook.pages)
+                  if (current.id == page.id) page else current,
+              ],
+            )
+          else
+            notebook,
       ],
     );
   }

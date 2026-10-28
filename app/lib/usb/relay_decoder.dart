@@ -5,6 +5,7 @@ import '../protocol/constants.dart';
 import '../protocol/relay_codec.dart';
 import '../protocol/tablet_buttons.dart';
 import 'hid_descriptor.dart';
+import 'hid_report.dart';
 import 'pen_report_reader.dart';
 import 'tablet_keys.dart';
 import 'tablet_profile.dart';
@@ -56,6 +57,16 @@ class RelayDecoder {
   int controlNotifications = 0;
   int descriptorBytes = 0;
 
+  /// The first data byte of the last pen report and what it means, such as
+  /// `c2 = in range, barrel`. Pen buttons show up here.
+  String? lastPenBits;
+
+  /// The last few control reports that are not all zeros after the report
+  /// id, newest first, as hex with the button they mean, such as
+  /// `02 01 00 2d 00 00 00 00 = undo`. A release is left out so it does not
+  /// hide the press. An unknown key shows with no name.
+  final List<String> recentControl = [];
+
   /// The pen reports the relay's descriptors declare, such as
   /// `id 5: x 0-4095, y 0-4095, pressure 0-2047`.
   List<String> get layoutNames => [
@@ -97,11 +108,23 @@ class RelayDecoder {
 
   RelayOutput _control(RelayNotification notification) {
     controlNotifications += 1;
-    return RelayOutput(
-      buttons: [
-        for (final record in notification.records) ..._keys.add(record.report),
-      ],
-    );
+    final buttons = <TabletButton>[];
+    for (final record in notification.records) {
+      final pressed = _keys.add(record.report);
+      buttons.addAll(pressed);
+      _noteControl(record.report, pressed);
+    }
+    return RelayOutput(buttons: buttons);
+  }
+
+  void _noteControl(Uint8List report, List<TabletButton> pressed) {
+    if (!report.skip(1).any((b) => b != 0)) return;
+    final hex = [
+      for (final b in report.take(12)) b.toRadixString(16).padLeft(2, '0'),
+    ].join(' ');
+    final names = pressed.map((b) => b.name).join(', ');
+    recentControl.insert(0, names.isEmpty ? hex : '$hex = $names');
+    if (recentControl.length > 3) recentControl.removeLast();
   }
 
   RelayOutput _pen(RelayNotification notification) {
@@ -140,6 +163,9 @@ class RelayDecoder {
         if (keys.isEmpty) dropped += 1;
         buttons.addAll(keys);
         continue;
+      }
+      if (record.report.length > 1) {
+        lastPenBits = penBits(record.report[1], reports.first);
       }
       final fields = penSampleFields(reports.first, _profile);
       if (run.isEmpty) runFirst = seq;

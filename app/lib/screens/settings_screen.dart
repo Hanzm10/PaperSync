@@ -7,6 +7,7 @@ import '../domain/ink.dart';
 import '../state/cloud.dart';
 import '../state/connection_mode.dart';
 import '../state/pen_transport_provider.dart';
+import '../state/recognition.dart';
 import '../state/ui_preferences.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
@@ -16,7 +17,7 @@ import 'account_sync_screen.dart';
 import 'device_screen.dart';
 import 'sync_issue_screen.dart';
 
-/// Settings frame `2003:190`. Recognition, mobile data, and export are local.
+/// Settings frame `2003:190`. Mobile data and export are local choices.
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
@@ -32,6 +33,7 @@ class SettingsScreen extends ConsumerWidget {
     final turn = ref.watch(tabletTurnProvider);
     final mode = ref.watch(connectionModeProvider);
     final signedIn = ref.watch(paperSyncAuthProvider).current != null;
+    final recognition = ref.watch(recognitionProvider);
     final email = prefs.email.trim();
     final heading = signedIn && email.isNotEmpty ? email : 'Not signed in';
     final battery = link.batteryPercent;
@@ -149,13 +151,12 @@ class SettingsScreen extends ConsumerWidget {
                       .push(MaterialPageRoute<void>(builder: (_) => next));
                 },
               ),
-              SettingsTile(
-                title: 'Handwriting recognition',
-                trailing: Text(
-                  prefs.handwritingLabel,
-                  style: Theme.of(context).textTheme.labelMedium,
-                ),
-                onPressed: prefsController.toggleHandwriting,
+              _RecognitionTile(
+                on: prefs.handwritingOn,
+                status: recognition,
+                onToggle: prefsController.toggleHandwriting,
+                onDownload: () =>
+                    ref.read(recognitionProvider.notifier).download(),
               ),
               Divider(height: 1, color: colors.line),
               SettingsTile(
@@ -186,6 +187,60 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Handwriting recognition: download the model once, then on or off.
+class _RecognitionTile extends StatelessWidget {
+  const _RecognitionTile({
+    required this.on,
+    required this.status,
+    required this.onToggle,
+    required this.onDownload,
+  });
+
+  final bool on;
+  final RecognitionStatus status;
+  final VoidCallback onToggle;
+  final VoidCallback onDownload;
+
+  @override
+  Widget build(BuildContext context) {
+    final (
+      String? subtitle,
+      String label,
+      VoidCallback? tap,
+    ) = switch (status.model) {
+      InkModel.unsupported => ('Needs the Android app', 'Off', null),
+      InkModel.checking => (null, 'Checking', null),
+      InkModel.missing => (
+        'English model, about 20 MB, downloaded once',
+        'Download',
+        onDownload,
+      ),
+      InkModel.downloading => ('Keep the app open', 'Downloading', null),
+      InkModel.failed => (
+        'Download failed. Tap to try again.',
+        'Retry',
+        onDownload,
+      ),
+      InkModel.ready => (
+        !on
+            ? 'Search finds only notebook names'
+            : status.reading > 0
+            ? 'Reading ${status.reading} '
+                  '${status.reading == 1 ? 'page' : 'pages'}'
+            : 'English, on this phone',
+        on ? 'On' : 'Off',
+        onToggle,
+      ),
+    };
+    return SettingsTile(
+      title: 'Handwriting recognition',
+      subtitle: subtitle,
+      trailing: Text(label, style: Theme.of(context).textTheme.labelMedium),
+      onPressed: tap,
     );
   }
 }

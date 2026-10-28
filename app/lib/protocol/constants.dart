@@ -58,6 +58,12 @@ const int flagPageButton = 0x02;
 /// They carry no sequence numbers and are never replayed.
 const int flagControl = 0x04;
 
+/// v3 header bit 3: one report follows the header with no `dt_ms` or length
+/// byte. The relay uses it when the link is too small for a record: the
+/// default 23 byte MTU leaves 20 bytes, a header and one 8 byte report. Web
+/// Bluetooth cannot ask for a larger MTU.
+const int flagBare = 0x08;
+
 /// Read and notify. The HID report descriptors of the forwarded interfaces,
 /// back to back, so the app can lay out the reports itself.
 const String reportDescriptorCharacteristicUuid =

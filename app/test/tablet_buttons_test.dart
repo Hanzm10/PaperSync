@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:papersync/ble/pen_transport.dart';
 import 'package:papersync/ble/simulated_pen_transport.dart';
 import 'package:papersync/models/ink_models.dart';
 import 'package:papersync/models/pen_link.dart';
+import 'package:papersync/protocol/codec.dart';
+import 'package:papersync/protocol/constants.dart';
 import 'package:papersync/protocol/tablet_buttons.dart';
 import 'package:papersync/screens/live_capture_screen.dart';
 import 'package:papersync/state/app_controller.dart';
@@ -39,8 +41,47 @@ class _ButtonPen extends SimulatedPenTransport implements ButtonSource {
   final StreamController<TabletButton> presses =
       StreamController<TabletButton>.broadcast();
 
+  /// Pen notifications a test sends, in place of the simulator's own.
+  // Closed by each test.
+  // ignore: close_sinks
+  final StreamController<Uint8List> notes =
+      StreamController<Uint8List>.broadcast(sync: true);
+
   @override
   Stream<TabletButton> get buttons => presses.stream;
+
+  @override
+  Stream<Uint8List> get notifications => notes.stream;
+}
+
+/// One v1 notification of pen samples at tablet millimetres, all touching
+/// or all lifted.
+Uint8List _penNote(
+  int firstSeq,
+  List<(double, double)> points, {
+  bool touch = true,
+}) {
+  return encode(
+    Notification(
+      version: 1,
+      headerFlags: 0,
+      bootId: 9,
+      firstSeq: firstSeq,
+      baseTimeMs: 1000 + firstSeq * 10,
+      samples: [
+        for (var i = 0; i < points.length; i++)
+          Sample(
+            seq: firstSeq + i,
+            tDeviceMs: 1000 + firstSeq * 10 + i,
+            xMm: points[i].$1,
+            yMm: points[i].$2,
+            pressure: touch ? 4000 : 0,
+            flags: touch ? flagTouching : flagHover,
+            dtMs: i,
+          ),
+      ],
+    ),
+  );
 }
 
 void main() {
@@ -53,8 +94,8 @@ void main() {
         '0201002e00000000 0200000000000000': TabletButton.redo,
         '0200002f00000000 0200000000000000': TabletButton.zoomOut,
         '0200003000000000 0200000000000000': TabletButton.zoomIn,
-        '0200002b00000000 0200000000000000': TabletButton.newPage,
-        '0200002c00000000 0200000000000000': TabletButton.nextColor,
+        '0200002b00000000 0200000000000000': TabletButton.previousPage,
+        '0200002c00000000 0200000000000000': TabletButton.nextPage,
       };
       for (final entry in captured.entries) {
         expect(TabletKeyDecoder().add(_hex(entry.key)), [entry.value]);
@@ -66,6 +107,19 @@ void main() {
       expect(decoder.add(_hex('0201002d00000000')), [TabletButton.undo]);
       expect(decoder.add(_hex('0201002d00000000')), isEmpty);
       expect(decoder.add(_hex('0200000000000000')), isEmpty);
+      expect(decoder.add(_hex('0201002d00000000')), [TabletButton.undo]);
+    });
+
+    test('the pen buttons: minus erases while held, plus is next color', () {
+      final decoder = TabletKeyDecoder();
+      // Captured on the phone: minus is Ctrl and Z, plus is Ctrl, Shift
+      // and Z.
+      expect(decoder.add(_hex('0201001d00000000')), [TabletButton.eraseStart]);
+      expect(decoder.add(_hex('0201001d00000000')), isEmpty);
+      expect(decoder.add(_hex('0200000000000000')), [TabletButton.eraseEnd]);
+      expect(decoder.add(_hex('0203001d00000000')), [TabletButton.nextColor]);
+      expect(decoder.add(_hex('0200000000000000')), isEmpty);
+      // The tablet's own undo, Ctrl and minus, is unchanged.
       expect(decoder.add(_hex('0201002d00000000')), [TabletButton.undo]);
     });
 
@@ -96,6 +150,7 @@ void main() {
     tearDown(() async {
       container.dispose();
       await pen.presses.close();
+      await pen.notes.close();
     });
 
     NotebookPage live() {
@@ -136,7 +191,35 @@ void main() {
       stroke(controller, 10);
       controller.drawStart(const Offset(30, 30));
       controller.undo(live().id);
+      // The open stroke joins the page when it closes, and undo left the
+      // first stroke alone.
+      expect(live().visibleStrokes, hasLength(1));
+      controller.drawEnd();
       expect(live().visibleStrokes, hasLength(2));
+    });
+
+    test('points of an open stroke do not change the app state', () {
+      final controller = container.read(appControllerProvider.notifier)
+        ..startLive('nb-one', phoneDrawing: true);
+      var updates = 0;
+      final sub = container.listen(appControllerProvider, (_, _) => updates++);
+      var liveUpdates = 0;
+      void onLive() => liveUpdates++;
+      controller.liveInk.addListener(onLive);
+      controller.drawStart(const Offset(10, 10));
+      final atOpen = updates;
+      for (var i = 0; i < 200; i++) {
+        controller.drawMove(Offset(10 + i * 0.2, 10));
+      }
+      // 200 points: the live layer hears each one, the app state none.
+      expect(updates, atOpen);
+      expect(liveUpdates, greaterThanOrEqualTo(200));
+      expect(controller.liveInk.value.points, hasLength(201));
+      controller.drawEnd();
+      expect(live().visibleStrokes.single.points, hasLength(201));
+      expect(controller.liveInk.value.writing, isFalse);
+      controller.liveInk.removeListener(onLive);
+      sub.close();
     });
 
     test('the buttons undo, redo, turn the page and change color', () async {
@@ -154,16 +237,39 @@ void main() {
       await Future<void>.delayed(Duration.zero);
       expect(live().visibleStrokes, hasLength(1));
 
+      // One press changes the color once the double press window passes.
       pen.presses.add(TabletButton.nextColor);
       await Future<void>.delayed(Duration.zero);
-      final notebook = container
-          .read(appControllerProvider)
-          .notebook('nb-one')!;
+      var notebook = container.read(appControllerProvider).notebook('nb-one')!;
+      expect(notebook.inkColorArgb, AppColors.storedInk.toARGB32());
+      await Future<void>.delayed(
+        AppController.doublePress + const Duration(milliseconds: 50),
+      );
+      notebook = container.read(appControllerProvider).notebook('nb-one')!;
       expect(notebook.inkColorArgb, AppColors.inkBlue.toARGB32());
 
-      pen.presses.add(TabletButton.newPage);
+      // Next page on the last page starts a new one.
+      pen.presses.add(TabletButton.nextPage);
       await Future<void>.delayed(Duration.zero);
       expect(live().pageIndex, 2);
+      stroke(controller, 30);
+
+      // Previous page goes back, and stops at the first page.
+      pen.presses.add(TabletButton.previousPage);
+      await Future<void>.delayed(Duration.zero);
+      expect(live().pageIndex, 1);
+      expect(live().visibleStrokes, hasLength(1));
+      pen.presses.add(TabletButton.previousPage);
+      await Future<void>.delayed(Duration.zero);
+      expect(live().pageIndex, 1);
+
+      // Next page goes to the page that is there, without making another.
+      pen.presses.add(TabletButton.nextPage);
+      await Future<void>.delayed(Duration.zero);
+      expect(live().pageIndex, 2);
+      expect(live().visibleStrokes, hasLength(1));
+      final pages = container.read(appControllerProvider).notebook('nb-one')!;
+      expect(pages.pages, hasLength(2));
 
       pen.presses.add(TabletButton.zoomIn);
       await Future<void>.delayed(Duration.zero);
@@ -171,9 +277,60 @@ void main() {
         TabletButton.undo,
         TabletButton.redo,
         TabletButton.nextColor,
-        TabletButton.newPage,
+        TabletButton.nextPage,
+        TabletButton.previousPage,
+        TabletButton.previousPage,
+        TabletButton.nextPage,
         TabletButton.zoomIn,
       ]);
+      await sub.cancel();
+    });
+
+    test('a double press of the color button opens the picker', () async {
+      final controller = container.read(appControllerProvider.notifier)
+        ..startLive('nb-one');
+      final seen = <TabletButton>[];
+      final sub = controller.tabletButtons.listen(seen.add);
+      pen.presses.add(TabletButton.nextColor);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      pen.presses.add(TabletButton.nextColor);
+      await Future<void>.delayed(
+        AppController.doublePress + const Duration(milliseconds: 50),
+      );
+      expect(seen, [TabletButton.pickColor]);
+      // The color does not change on a double press.
+      final notebook = container
+          .read(appControllerProvider)
+          .notebook('nb-one')!;
+      expect(notebook.inkColorArgb, AppColors.storedInk.toARGB32());
+      await sub.cancel();
+    });
+
+    test('the pen erase button turns pen touches into erasing', () async {
+      final controller = container.read(appControllerProvider.notifier)
+        ..startLive('nb-one');
+      final seen = <TabletButton>[];
+      final sub = controller.tabletButtons.listen(seen.add);
+      // A pen stroke across the tablet, then the pen lifts.
+      pen.notes.add(_penNote(0, [(40, 40), (60, 50), (80, 60)]));
+      pen.notes.add(_penNote(3, [(80, 60)], touch: false));
+      expect(live().visibleStrokes, hasLength(1));
+
+      pen.presses.add(TabletButton.eraseStart);
+      await Future<void>.delayed(Duration.zero);
+      expect(seen, [TabletButton.eraseStart]);
+      // Touching the stroke again erases it and draws nothing.
+      pen.notes.add(_penNote(4, [(60, 50), (61, 50)]));
+      pen.notes.add(_penNote(6, [(61, 50)], touch: false));
+      expect(live().visibleStrokes, isEmpty);
+
+      pen.presses.add(TabletButton.eraseEnd);
+      await Future<void>.delayed(Duration.zero);
+      expect(seen.last, TabletButton.eraseEnd);
+      // Writing again draws.
+      pen.notes.add(_penNote(7, [(20, 20), (30, 30)]));
+      pen.notes.add(_penNote(9, [(30, 30)], touch: false));
+      expect(live().visibleStrokes, hasLength(1));
       await sub.cancel();
     });
 
@@ -221,11 +378,24 @@ void main() {
 
     pen.presses.add(TabletButton.nextColor);
     await tester.pump();
+    await tester.pump(
+      AppController.doublePress + const Duration(milliseconds: 50),
+    );
     await tester.pump();
     expect(find.byKey(const Key('ink-flash')), findsOneWidget);
     expect(find.text('Blue ink'), findsOneWidget);
     await tester.pump(const Duration(milliseconds: 1300));
     expect(find.byKey(const Key('ink-flash')), findsNothing);
+
+    // The pen's erase button shows a chip while held.
+    pen.presses.add(TabletButton.eraseStart);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('pen-eraser')), findsOneWidget);
+    pen.presses.add(TabletButton.eraseEnd);
+    await tester.pump();
+    await tester.pump();
+    expect(find.byKey(const Key('pen-eraser')), findsNothing);
 
     // Leaving stops capture after the frame, so let that run.
     await tester.pumpWidget(const SizedBox.shrink());

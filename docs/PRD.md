@@ -66,10 +66,10 @@ Verified from the repository, not from running the app.
 | Encrypted local storage, checkpoints, migrations, corruption quarantine | Built (`lib/storage`) |
 | Email and password sign in, Supabase sync with row level security | Built (`lib/sync`, `supabase/migrations`) |
 | Screens from the earlier monochrome Figma | Built (`lib/screens`) |
-| Search over text already stored on a page | Built. No handwriting recognition runs. |
+| Search over text already stored on a page | Built. Recognized text from ML Kit fills it. |
 | PDF and image export | Built (`lib/export`) |
 | USB transport | Not started |
-| Ink recognition (ML Kit) | Not started |
+| Ink recognition (ML Kit) | Built: on-phone English model downloaded from Settings, pages read line by line a few seconds after the ink stops changing. Not yet measured against the 8 of 10 target. |
 | Reference-image visual design | Not started |
 
 Known UI-only placeholders to resolve or hide: password reset, storage size, last sync time, mobile data switch, handwriting recognition toggle, export default (see `docs/ui-figma-map.md`).
@@ -211,11 +211,12 @@ The tablet has six buttons in three rocker pairs, along the bottom when the tabl
 | --- | --- | --- |
 | Left | Redo | Undo |
 | Middle | Zoom in | Zoom out |
-| Right | Next color | New page |
+| Right | Next page (a new page after the last) | Previous page |
 
 - FR-B4 (P0). Zoom in centres on the pen's last position. Zoom out steps back until the whole page fits.
-- FR-B5 (P0). Next color cycles through the editor's palette and shows a short color chip on screen.
-- FR-B6 (P0). New page does what the controller's page button does (FR-X3).
+- FR-B5 (P0). Next color (now on the pen's + button, FR-B7) cycles through the editor's palette and shows a short color chip on screen. A double press within 350 ms opens the ink color picker instead, so a single press waits out that window.
+- FR-B6 (P0). Next page moves the live page to the following page, or starts a new page when the live page is the last one, as the controller's page button does (FR-X3). Previous page moves back one page and does nothing on the first page. (Changed 2026-10-18: the right rocker was next color and new page.)
+- FR-B7 (P1). The pen's two buttons: − erases while held (the pen tip erases the strokes it touches, and an Eraser chip shows), + is next color and a double press opens the color picker. They send Ctrl and Z, and Ctrl, Shift and Z, as keyboard reports on the same endpoint as the tablet's buttons. In Draw on phone mode they do not change what a finger does.
 
 ### 6.7 Search and recognition
 
@@ -403,7 +404,7 @@ Mapping to millimetres: `xMm = x / 32759 * 170` and `yMm = y / 32759 * 107`, in 
 - **Security.** All bytes from BLE and USB are untrusted. Local data AES-256, key in Keychain or Keystore, Android backup off. Row level security forced on every table. No tokens or emails in logs. Debug tools only in debug builds.
 - **Privacy.** Recognition is on device. Nothing leaves the phone without sign in.
 - **Accessibility.** Dynamic type up to 200 percent, screen reader labels on every control, contrast per 7.1.
-- **Platforms.** Demo devices: any Android phone with USB host support for Bluetooth and USB (the exact model does not matter), and an iPhone for Bluetooth only. Android 8.0 and up (OTG needs Android 3.1 host support, practically all current phones). iOS 15 and up for Bluetooth. Confirm the phone supports USB host before offering USB mode.
+- **Platforms.** Demo device: any Android phone with USB host support, for Bluetooth and USB (the exact model does not matter). iOS keeps Bluetooth support but is outside the demo. Android 8.0 and up (OTG needs Android 3.1 host support, practically all current phones). iOS 15 and up for Bluetooth. Confirm the phone supports USB host before offering USB mode.
 - **Quality bar** (from the existing plan, still applies): strict lints, sealed classes, no `dynamic`, layer rules enforced by `test/architecture_test.dart`, `pubspec.lock` committed, dependency vulnerability scan before each merge.
 
 ## 10. Architecture changes
@@ -452,12 +453,14 @@ Cut order if time runs out: lasso and ink style, paper style, starred pages and 
 
 Decided:
 
-- Demo devices are any Android phone with USB host support and an iPhone (Bluetooth test). The Android model does not matter.
+- The main product is the Android app with the notebook (decided 2026-10-18). The notebook reaches the phone through the ESP32 relay over Bluetooth, or straight over a USB cable. Both work on real hardware.
+- The web app (GitHub Pages) is a fallback, not a demo target. It runs the demo pen, and in Chrome and Edge it can reach the relay over Web Bluetooth, but that path is less reliable than the app and gets no further work unless the app fails.
+- The demo device is an Android phone with USB host support, for both Bluetooth and the USB cable (decided 2026-10-18). The Android model does not matter. The iPhone is not a demo device. The iOS build still supports Bluetooth but is not tested for the demo.
 - No background capture. The screen stays awake during capture (FR-K7).
 - Recognition is English only, on the phone. Syncing recognized text to a second device is not needed for the demo.
 - The app name and logo stay as they are.
 - The page button goes on the tablet housing. The BOOT button is the stand in until then. On the cable path one of the tablet's own buttons is New page (FR-B3).
-- The tablet's buttons are Undo, Redo, Zoom in, Zoom out, New page and Next color (FR-B3). There is no Previous color.
+- The tablet's buttons are Undo, Redo, Zoom in, Zoom out, Next page and Previous page (FR-B3). Next color moved to the pen's + button.
 - Only the live page edits. Other pages are view only (FR-E10, FR-E11).
 - UUIDs from `docs/protocol-v1.md` are locked.
 - Page button is `header_flags` bit 1 (FR-X3).
@@ -470,7 +473,7 @@ Still open:
 
 1. Answered 2026-10-18: the ESP32-S3 works as a USB host on esp32 core 3.0.7 (not 3.3.12) with clean wiring and no hub. It gets Report ID 5, like the phone. The relay firmware (protocol v3) runs on the board and the pen and buttons reach the app over Bluetooth (verified 2026-10-18).
 2. Raw reports or pointer events for the cable path. The week 1 spike on a real phone decides (FR-U13).
-3. Battery level needs a resistor divider on the ESP32 before the Battery Service can report a real value.
+3. Battery level is skipped for this release (decided 2026-10-18): no resistor divider, so the relay sends no Battery Service and the app shows no percentage.
 
 ## 14. Acceptance tests
 

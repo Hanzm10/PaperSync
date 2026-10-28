@@ -128,7 +128,14 @@ With the tablet held as the page (buttons along the bottom), the left rocker is 
 | Left | bottom | Ctrl and `-` (`0x2D`) | Undo |
 | Middle | top | `]` (`0x30`) | Zoom in |
 | Middle | bottom | `[` (`0x2F`) | Zoom out |
-| Right | top | Space (`0x2C`) | Next color |
-| Right | bottom | Tab (`0x2B`) | New page |
+| Right | top | Space (`0x2C`) | Next page (new after the last) |
+| Right | bottom | Tab (`0x2B`) | Previous page |
 
-The app reads only the key code, never the modifier. A press is a key that was not held in the report before, so holding a button counts once. The mapping lives in `t605Keys` in `app/lib/usb/tablet_keys.dart`.
+The pen's two buttons send the same keyboard report, both with the Z key, told apart by the modifiers (measured 2026-10-18):
+
+| Pen button | Sends | App action |
+| --- | --- | --- |
+| − | Ctrl and Z (`02 01 00 1d`) | Erase while held |
+| + | Ctrl, Shift and Z (`02 03 00 1d`) | Next color, double press opens the picker |
+
+They do not change the pen report's flag byte. The tablet's buttons match on the key code alone. The pen's buttons match on the key and the modifiers (`t605Chords`). A press is a key that was not held in the report before, so holding a button counts once. The mapping lives in `t605Keys` in `app/lib/usb/tablet_keys.dart`.

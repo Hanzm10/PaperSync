@@ -48,6 +48,7 @@ class RelayNotification {
   bool get replayed => headerFlags & flagReplayed != 0;
   bool get pageButton => headerFlags & flagPageButton != 0;
   bool get control => headerFlags & flagControl != 0;
+  bool get bare => headerFlags & flagBare != 0;
 }
 
 sealed class RelayDecodeResult {
@@ -89,8 +90,22 @@ RelayDecodeResult decodeRelay(Uint8List bytes) {
     return const RelayRejected(RejectReason.badVersion);
   }
   final records = <RelayRecord>[];
+  final flags = data.getUint8(1);
   var at = headerBytes;
-  while (at + relayRecordHeaderBytes <= bytes.length) {
+  if (flags & flagBare != 0) {
+    // One report, the rest of the packet, read at the header's time.
+    final length = bytes.length - headerBytes;
+    if (length > 0 && length <= maxRelayReportBytes) {
+      records.add(
+        RelayRecord(
+          dtMs: 0,
+          report: Uint8List.fromList(bytes.sublist(headerBytes)),
+        ),
+      );
+      at = bytes.length;
+    }
+  }
+  while (flags & flagBare == 0 && at + relayRecordHeaderBytes <= bytes.length) {
     final dtMs = bytes[at];
     final length = bytes[at + 1];
     final start = at + relayRecordHeaderBytes;
@@ -109,7 +124,7 @@ RelayDecodeResult decodeRelay(Uint8List bytes) {
   }
   return RelayDecoded(
     RelayNotification(
-      headerFlags: data.getUint8(1),
+      headerFlags: flags,
       bootId: data.getUint16(2, Endian.little),
       firstSeq: data.getUint32(4, Endian.little),
       baseTimeMs: data.getUint32(8, Endian.little),
@@ -130,6 +145,17 @@ Uint8List encodeRelay(RelayNotification notification) {
     ..setUint32(4, notification.firstSeq & 0xFFFFFFFF, Endian.little)
     ..setUint32(8, notification.baseTimeMs & 0xFFFFFFFF, Endian.little);
   builder.add(header.buffer.asUint8List());
+  if (notification.bare) {
+    if (notification.records.isNotEmpty) {
+      final report = notification.records.first.report;
+      builder.add(
+        report.length > maxRelayReportBytes
+            ? report.sublist(0, maxRelayReportBytes)
+            : report,
+      );
+    }
+    return builder.toBytes();
+  }
   for (final record in notification.records) {
     final report = record.report.length > maxRelayReportBytes
         ? record.report.sublist(0, maxRelayReportBytes)

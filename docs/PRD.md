@@ -66,10 +66,10 @@ Verified from the repository, not from running the app.
 | Encrypted local storage, checkpoints, migrations, corruption quarantine | Built (`lib/storage`) |
 | Email and password sign in, Supabase sync with row level security | Built (`lib/sync`, `supabase/migrations`) |
 | Screens from the earlier monochrome Figma | Built (`lib/screens`) |
-| Search over text already stored on a page | Built. No handwriting recognition runs. |
+| Search over text already stored on a page | Built. Recognized text from ML Kit fills it. |
 | PDF and image export | Built (`lib/export`) |
 | USB transport | Not started |
-| Ink recognition (ML Kit) | Not started |
+| Ink recognition (ML Kit) | Built: on-phone English model downloaded from Settings, pages read line by line a few seconds after the ink stops changing. Not yet measured against the 8 of 10 target. |
 | Reference-image visual design | Not started |
 
 Known UI-only placeholders to resolve or hide: password reset, storage size, last sync time, mobile data switch, handwriting recognition toggle, export default (see `docs/ui-figma-map.md`).

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/ink_models.dart';
 import '../state/app_controller.dart';
+import '../state/recognition.dart';
 import '../theme/app_colors.dart';
 import '../theme/tokens.dart';
 import '../widgets/app_top_bar.dart';
@@ -79,7 +80,15 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
         child: Padding(
           padding: const EdgeInsets.all(PaperTokens.space32),
           child: Text(
-            'Search reads your handwriting after a page is saved.',
+            switch (ref.watch(recognitionProvider).model) {
+              InkModel.missing || InkModel.failed =>
+                'Download handwriting recognition in Settings to search '
+                    'what you write.',
+              InkModel.downloading => 'Downloading handwriting recognition.',
+              _ =>
+                'Search reads your handwriting a few seconds after you '
+                    'stop writing.',
+            },
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium
                 ?.copyWith(color: colors.meta),

@@ -18,6 +18,7 @@ import 'screens/welcome_screen.dart';
 import 'state/app_controller.dart';
 import 'state/cloud.dart';
 import 'state/notebook_store_provider.dart';
+import 'state/recognition.dart';
 import 'state/ui_preferences.dart';
 import 'storage/checkpoint_scheduler.dart';
 import 'storage/key_store.dart';
@@ -134,6 +135,9 @@ class _HomeState extends ConsumerState<_Home> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     ref.watch(syncCoordinatorProvider);
+    // Kept alive for the app's life so pages are read in the background.
+    // Listening, not watching, so its progress does not rebuild the app.
+    ref.listen(recognitionProvider, (_, _) {});
     final inLibrary = ref.watch(uiPreferencesProvider).inLibrary;
     if (!inLibrary) {
       return WelcomeScreen(

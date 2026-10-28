@@ -1197,6 +1197,20 @@ class AppController extends Notifier<AppModel> {
     );
   }
 
+  /// Stores what handwriting recognition read on a page. Only the text
+  /// changes, so strokes written meanwhile are kept.
+  void setRecognizedText(String pageId, String text) {
+    for (final notebook in state.notebooks) {
+      for (final page in notebook.pages) {
+        if (page.id != pageId) continue;
+        if (page.recognizedText == text) return;
+        _replacePage(page.copyWith(recognizedText: text));
+        _persist(_store.setRecognizedText(pageId, text));
+        return;
+      }
+    }
+  }
+
   void _persist(Future<void> write) {
     unawaited(write.catchError((Object _) {}));
   }

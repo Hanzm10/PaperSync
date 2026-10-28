@@ -177,6 +177,27 @@ class HiveNotebookStore implements NotebookStore {
   }
 
   @override
+  Future<void> setRecognizedText(String pageId, String text) {
+    final page = _page(pageId);
+    if (page == null || page.recognizedText == text) return Future.value();
+    final saved = page.copyWith(recognizedText: text);
+    _replace(page.notebookId, (notebook) {
+      return notebook.copyWith(
+        pages: [
+          for (final current in notebook.pages)
+            if (current.id == pageId) saved else current,
+        ],
+      );
+    });
+    return _enqueue(() async {
+      final stored = _pagesBox.get(pageId);
+      if (stored == null) return;
+      await _pagesBox.put(pageId, stored.copyWith(recognizedText: text));
+      await _pagesBox.flush();
+    });
+  }
+
+  @override
   Future<void> softDeletePage(String pageId, {DateTime? at}) {
     final when = at ?? DateTime.now();
     String? notebookId;

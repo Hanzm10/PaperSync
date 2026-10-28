@@ -151,6 +151,7 @@ class StoredPage {
   }
 
   StoredPage copyWith({
+    String? recognizedText,
     int? deletedAtUs,
     int? syncState,
     String? ownerId,
@@ -167,7 +168,7 @@ class StoredPage {
       paperTop: paperTop,
       paperWidth: paperWidth,
       paperHeight: paperHeight,
-      recognizedText: recognizedText,
+      recognizedText: recognizedText ?? this.recognizedText,
       markers: markers,
       deletedAtUs: deletedAtUs ?? this.deletedAtUs,
       syncState: syncState ?? this.syncState,

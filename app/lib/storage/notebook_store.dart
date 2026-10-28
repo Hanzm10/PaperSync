@@ -35,6 +35,11 @@ abstract class NotebookStore implements SyncLedger {
 
   Future<void> savePage(NotebookPage page);
 
+  /// Stores what handwriting recognition read on a page. Touches nothing
+  /// else, so it cannot undo strokes written while recognition ran. Local
+  /// only: it does not queue the page for upload.
+  Future<void> setRecognizedText(String pageId, String text);
+
   Future<void> softDeletePage(String pageId, {DateTime? at});
 
   Future<void> upsertStroke(String pageId, Stroke stroke);
@@ -159,6 +164,11 @@ class MemoryNotebookStore implements NotebookStore {
         syncState: SyncState.pending,
       );
     });
+  }
+
+  @override
+  Future<void> setRecognizedText(String pageId, String text) async {
+    _replacePage(pageId, (page) => page.copyWith(recognizedText: text));
   }
 
   @override

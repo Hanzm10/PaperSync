@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Presentation choices for screens that have no Phase 1–4 service.
 ///
-/// Handwriting recognition and mobile-data sync are stored here so the
-/// settings screen can show them. They do not start ML Kit or change sync.
+/// Mobile-data sync is stored here so the settings screen can show it; it
+/// does not change sync. [handwritingOn] does switch recognition on and off.
 class UiPreferences {
   const UiPreferences({
     this.inLibrary = false,
@@ -23,7 +23,7 @@ class UiPreferences {
   final String displayName;
   final String email;
 
-  /// UI-only. Search still uses text already saved on a page.
+  /// Whether pages are read for search once the model is downloaded.
   final bool handwritingOn;
 
   /// UI-only. The sync service has no mobile-data switch.

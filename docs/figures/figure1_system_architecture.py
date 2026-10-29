@@ -42,11 +42,11 @@ box(X[1], R2, "Cloud", "Supabase\nBackup and sync\nwhen signed in")
 
 # Power, beside the relay, both inside the cardboard case.
 PX, PW = X[2] + BW + GAP, 1.75
-box(PX, R1, "Relay Power", "3.7 V LiPo\nTP4056 charger\nOn/off switch\nMT3608 boost (5 V)", w=PW)
+box(PX, R1, "Power Bank", "Supplies 5 V\nto the relay\nand the tablet\nRecharged by USB", w=PW)
 ax.add_patch(FancyBboxPatch((X[2] - 0.12, R1 - 0.32), PX + PW - X[2] + 0.24, BH + 0.5,
              boxstyle="round,pad=0.02,rounding_size=0.12", fc="none", ec="black", lw=1.0,
              linestyle=(0, (1, 2))))
-ax.text(X[2] + (PX + PW - X[2]) / 2, R1 - 0.18, "Cardboard case on the back of the tablet",
+ax.text(X[2] + (PX + PW - X[2]) / 2, R1 - 0.18, "Cardboard box taped to the back of the tablet",
         ha="center", va="center", fontsize=9.5, style="italic")
 
 mid1, mid2 = R1 + BH / 2, R2 + BH / 2

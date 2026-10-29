@@ -245,11 +245,21 @@ class _RecognitionTile extends StatelessWidget {
   }
 }
 
-/// The useful end of an Android error, such as "Network is unreachable",
-/// without the Java class names in front of it.
+/// A readable reason for a failed model download.
 String _shortError(String? error) {
   if (error == null || error.trim().isEmpty) return 'no reason given';
-  final text = error.split(':').last.trim();
-  final short = text.isEmpty ? error.trim() : text;
+  if (error.contains('UnknownHostException') ||
+      error.contains('Unable to resolve host')) {
+    // The network could not find Google's download server, which school and
+    // office Wi-Fi often block.
+    return "this network blocks Google's download server. "
+        'Try mobile data or another Wi-Fi';
+  }
+  if (error.contains('SocketTimeoutException') || error.contains('timed out')) {
+    return 'the connection timed out';
+  }
+  final firstLine = error.trim().split('\n').first;
+  final text = firstLine.split(':').last.trim();
+  final short = text.isEmpty ? firstLine : text;
   return short.length > 80 ? '${short.substring(0, 80)}...' : short;
 }

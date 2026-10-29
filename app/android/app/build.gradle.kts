@@ -37,6 +37,9 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+            // Keeps what the release shrinker would strip but WorkManager
+            // needs at runtime. See the file for why.
+            proguardFile("proguard-rules.pro")
         }
     }
 }
@@ -49,4 +52,11 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // ML Kit downloads its handwriting model through WorkManager. The
+    // version it pulls in crashes on start in release builds under R8 full
+    // mode (it cannot create its WorkDatabase), and newer versions fix that.
+    implementation("androidx.work:work-runtime:2.10.0")
 }

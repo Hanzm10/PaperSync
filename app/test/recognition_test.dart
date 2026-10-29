@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:papersync/ble/simulated_pen_transport.dart';
@@ -51,9 +52,10 @@ List<Stroke> _twoLines() => [
 
 /// Reads each line as the ids of its strokes, so tests can see the grouping.
 class _FakeRecognizer implements InkRecognizer {
-  _FakeRecognizer({this.ready = true});
+  _FakeRecognizer({this.ready = true, this.failWith});
 
   bool ready;
+  final Exception? failWith;
   final List<int> lineSizes = [];
 
   @override
@@ -66,7 +68,10 @@ class _FakeRecognizer implements InkRecognizer {
   Future<bool> isModelReady() async => ready;
 
   @override
-  Future<bool> downloadModel() async => ready = true;
+  Future<bool> downloadModel() async {
+    if (failWith != null) throw failWith!;
+    return ready = true;
+  }
 
   @override
   Future<String> recognizeLine(
@@ -184,6 +189,24 @@ void main() {
       await tester.pump();
       expect(container.read(recognitionProvider).model, InkModel.ready);
       expect(_text(container), 'line1\nline2');
+    });
+
+    testWidgets('a failed download keeps the reason the phone gave', (
+      tester,
+    ) async {
+      final recognizer = _FakeRecognizer(
+        ready: false,
+        failWith: PlatformException(
+          code: 'error',
+          details: 'MlKitException: Network is unreachable',
+        ),
+      );
+      final container = _container(recognizer, _model(_twoLines()));
+      await tester.pump();
+      await container.read(recognitionProvider.notifier).download();
+      final status = container.read(recognitionProvider);
+      expect(status.model, InkModel.failed);
+      expect(status.error, contains('Network is unreachable'));
     });
 
     testWidgets('pages that already have text are not read on start', (

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../domain/ink.dart';
@@ -15,17 +16,25 @@ import 'ui_preferences.dart';
 enum InkModel { unsupported, checking, missing, downloading, ready, failed }
 
 class RecognitionStatus {
-  const RecognitionStatus({this.model = InkModel.checking, this.reading = 0});
+  const RecognitionStatus({
+    this.model = InkModel.checking,
+    this.reading = 0,
+    this.error,
+  });
 
   final InkModel model;
 
   /// Pages waiting to be read or being read now.
   final int reading;
 
-  RecognitionStatus copyWith({InkModel? model, int? reading}) =>
+  /// Why the last download failed, as the phone reported it.
+  final String? error;
+
+  RecognitionStatus copyWith({InkModel? model, int? reading, String? error}) =>
       RecognitionStatus(
         model: model ?? this.model,
         reading: reading ?? this.reading,
+        error: error,
       );
 }
 
@@ -103,11 +112,22 @@ class RecognitionController extends Notifier<RecognitionStatus> {
     final epoch = _epoch;
     state = state.copyWith(model: InkModel.downloading);
     var ok = false;
+    String? error;
     try {
       ok = await _recognizer.downloadModel();
-    } catch (_) {}
+      if (!ok) error = 'The phone did not finish the download';
+    } on PlatformException catch (e) {
+      error = e.details?.toString() ?? e.message ?? e.code;
+    } catch (e) {
+      error = e.toString();
+    }
+    // Printed in release builds too, so `flutter run` shows the full reason.
+    if (error != null) debugPrint('Handwriting model download failed: $error');
     if (epoch != _epoch) return;
-    state = state.copyWith(model: ok ? InkModel.ready : InkModel.failed);
+    state = state.copyWith(
+      model: ok ? InkModel.ready : InkModel.failed,
+      error: error,
+    );
     if (ok) _scanAll();
   }
 

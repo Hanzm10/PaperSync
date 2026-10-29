@@ -4,3 +4,9 @@
 # start with "Failed to create an instance of androidx.work.impl.WorkDatabase".
 -keep class * extends androidx.room.RoomDatabase { <init>(); }
 -keep class androidx.work.impl.WorkDatabase_Impl { *; }
+
+# ML Kit finds its model downloader and other parts by name at runtime.
+# Keep them whole so the release shrinker cannot break the model download.
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-dontwarn com.google.mlkit.**

@@ -33,8 +33,13 @@ class SyncService {
   static const _tombstoneRetention = Duration(days: 30);
 
   Future<SyncStatus>? _flight;
+  int _applied = 0;
 
   bool get isRunning => _flight != null;
+
+  /// Rows the last run took from the server. Above zero means local
+  /// notebooks changed, and screens showing them should refresh.
+  int get appliedInLastRun => _applied;
 
   Future<SyncStatus> run() {
     final existing = _flight;
@@ -70,6 +75,7 @@ class SyncService {
   }
 
   Future<void> _once() async {
+    _applied = 0;
     final account = auth.current;
     if (account == null) return;
     await ledger.claimUnowned(account.id);
@@ -189,6 +195,7 @@ class SyncService {
           remoteDeleted: row.isDeleted,
         )) {
           await ledger.applyNotebook(row);
+          _applied += 1;
         }
       }
       await ledger.setCursor(SyncTables.notebooks, page.last.updatedAt);
@@ -214,6 +221,7 @@ class SyncService {
           remoteDeleted: row.isDeleted,
         )) {
           await ledger.applyPage(row);
+          _applied += 1;
         }
       }
       await ledger.setCursor(SyncTables.pages, page.last.updatedAt);
@@ -239,6 +247,7 @@ class SyncService {
           remoteDeleted: row.isDeleted,
         )) {
           await ledger.applyStroke(row);
+          _applied += 1;
         }
       }
       await ledger.setCursor(SyncTables.strokes, page.last.updatedAt);

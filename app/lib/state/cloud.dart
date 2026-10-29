@@ -9,6 +9,7 @@ import '../sync/backoff.dart';
 import '../sync/failure.dart';
 import '../sync/remote.dart';
 import '../sync/sync_service.dart';
+import 'app_controller.dart';
 import 'flutter_test_env.dart';
 import 'notebook_store_provider.dart';
 
@@ -143,6 +144,9 @@ class SyncCoordinator {
     _ref.read(syncStatusProvider.notifier).state = const SyncSyncing();
     final status = await service.run();
     _ref.read(syncStatusProvider.notifier).state = status;
+    // Notebooks downloaded from another device only reach the screens
+    // through the app's own state, so refresh it from the store.
+    if (service.appliedInLastRun > 0) _refreshScreens();
     if (status is SyncFailed &&
         (status.reason is ServerError || status.reason is Offline)) {
       _failures += 1;
@@ -175,16 +179,23 @@ class SyncCoordinator {
         _debounce?.cancel();
         _retry?.cancel();
         await store.adoptUser(null);
+        _refreshScreens();
         _ref.read(syncStatusProvider.notifier).state = const SyncIdle();
         return;
       }
       await store.claimUnowned(account.id);
       await store.rememberHomeUser(account.id);
       await store.adoptUser(account.id);
+      // Signing in or out changes whose notebooks are visible.
+      _refreshScreens();
     } finally {
       _applyingAccount = false;
     }
     await syncNow();
+  }
+
+  void _refreshScreens() {
+    _ref.read(appControllerProvider.notifier).reloadFromStore();
   }
 
   void dispose() {

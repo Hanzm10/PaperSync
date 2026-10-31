@@ -113,6 +113,31 @@ void main() {
     expect(store.current.single.name, 'From cloud');
   });
 
+  test('a run reports how many rows it took from the server', () async {
+    final store = _store();
+    final remote = _FakeRemote();
+    final service = _service(store, remote);
+    final when = DateTime.utc(2026, 10, 29);
+    remote.pulledNotebooks = [
+      NotebookSyncRow(
+        id: _notebookId,
+        name: 'From the web',
+        inkColorArgb: 1,
+        version: 1,
+        createdAt: when,
+        updatedAt: when,
+        syncState: SyncState.synced,
+        ownerId: _user,
+      ),
+    ];
+    expect(await service.run(), isA<SyncIdle>());
+    expect(service.appliedInLastRun, 1);
+
+    remote.pulledNotebooks = [];
+    expect(await service.run(), isA<SyncIdle>());
+    expect(service.appliedInLastRun, 0);
+  });
+
   test('a rejected row is quarantined and the rest still sync', () async {
     final store = _store();
     final remote = _FakeRemote()..rejectNotebooks.add(_badId);

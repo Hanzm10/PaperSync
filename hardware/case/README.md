@@ -1,5 +1,9 @@
 # PaperSync relay case
 
+> Not used in the current build. Printing was too expensive, so the relay
+> lives in a cardboard case on the back of the tablet. These files are kept
+> in case a printed case is made later.
+
 A tray 160 x 240 mm, 21 mm tall with the lid. The T605 is 160 x 252; the case
 is 12 mm shorter so it prints in one piece on a 200 x 250 bed. It lines up with
 the tablet's bottom edge.

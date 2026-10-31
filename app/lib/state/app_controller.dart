@@ -1197,6 +1197,28 @@ class AppController extends Notifier<AppModel> {
     );
   }
 
+  /// Takes the notebooks from the store after something other than this
+  /// controller changed them: a sync that downloaded changes, or a sign-in
+  /// or sign-out that changed whose notebooks are shown. Notebooks that did
+  /// not change keep their identity, so their screens skip the work.
+  void reloadFromStore() {
+    final kept = {
+      for (final notebook in state.notebooks) notebook.id: notebook,
+    };
+    final next = [
+      for (final notebook in _store.current)
+        if (kept[notebook.id] == notebook) kept[notebook.id]! else notebook,
+    ];
+    final live = state.livePageId;
+    if (live != null &&
+        !next.any(
+          (notebook) => notebook.pages.any((page) => page.id == live),
+        )) {
+      stopLive();
+    }
+    state = state.copyWith(notebooks: next);
+  }
+
   /// Stores what handwriting recognition read on a page. Only the text
   /// changes, so strokes written meanwhile are kept.
   void setRecognizedText(String pageId, String text) {

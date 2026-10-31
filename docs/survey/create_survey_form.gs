@@ -65,20 +65,22 @@ function createPaperSyncSurvey() {
   summary.getRange('A1:C1').setValues([['Statement', 'Mean', 'Interpretation']])
     .setFontWeight('bold');
   // Columns: A timestamp, B name, C role, D frequency, E to J the ratings.
+  // Whole columns, because each response is inserted as a new row and a
+  // reference like E2:E would shift down past the data.
   const columns = ['E', 'F', 'G', 'H', 'I', 'J'];
   STATEMENTS.forEach(function (statement, i) {
     const row = i + 2;
     const col = columns[i];
     summary.getRange('A' + row).setValue(statement);
     summary.getRange('B' + row).setFormula(
-      '=IFERROR(ROUND(AVERAGE(' + src + '!' + col + '2:' + col + '),2),"")');
+      '=IFERROR(ROUND(AVERAGE(' + src + '!' + col + ':' + col + '),2),"")');
     summary.getRange('C' + row).setFormula(interpretation('B' + row));
   });
   summary.getRange('A8').setValue('Overall mean').setFontWeight('bold');
   summary.getRange('B8').setFormula('=IFERROR(ROUND(AVERAGE(B2:B7),2),"")');
   summary.getRange('C8').setFormula(interpretation('B8'));
   summary.getRange('A10').setValue('Respondents (n)').setFontWeight('bold');
-  summary.getRange('B10').setFormula('=COUNTA(' + src + '!A2:A)');
+  summary.getRange('B10').setFormula('=COUNTA(' + src + '!A:A)-1');
   summary.autoResizeColumns(1, 3);
 
   // Keep everything in the documentation folder.
